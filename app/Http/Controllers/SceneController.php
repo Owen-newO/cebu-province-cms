@@ -33,6 +33,60 @@ class SceneController extends Controller
     }
 
     // -----------------------------------------------------------
+    // Helpers for tour.xml on S3
+    // -----------------------------------------------------------
+    private function getTourXmlPath(string $municipalSlug): string
+    {
+        // S3 key: cebu/{municipalSlug}/tour.xml
+        return "cebu/{$municipalSlug}/tour.xml";
+    }
+
+    private function loadTourXmlFromS3(string $municipalSlug): ?string
+    {
+        $path = $this->getTourXmlPath($municipalSlug);
+        $disk = Storage::disk('s3');
+
+        if (!$disk->exists($path)) {
+            Log::error('❌ tour.xml not found on S3', [
+                's3_key'        => $path,
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return null;
+        }
+
+        try {
+            return $disk->get($path);
+        } catch (\Throwable $e) {
+            Log::error('❌ Failed reading tour.xml from S3', [
+                's3_key'        => $path,
+                'municipalSlug' => $municipalSlug,
+                'error'         => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    private function saveTourXmlToS3(string $municipalSlug, string $xml): void
+    {
+        $path = $this->getTourXmlPath($municipalSlug);
+        $disk = Storage::disk('s3');
+
+        try {
+            $disk->put($path, $xml);
+            Log::info('✅ tour.xml updated on S3', [
+                's3_key'        => $path,
+                'municipalSlug' => $municipalSlug,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('❌ Failed writing tour.xml to S3', [
+                's3_key'        => $path,
+                'municipalSlug' => $municipalSlug,
+                'error'         => $e->getMessage(),
+            ]);
+        }
+    }
+
+    // -----------------------------------------------------------
     // STORE
     // -----------------------------------------------------------
     public function store(Request $request)
@@ -105,7 +159,7 @@ class SceneController extends Controller
             $cubeRel    = ltrim($config['cube']    ?? '', '/');
             $multires   = $config['multires']      ?? '';
 
-            // Final S3 URLs: https://.../municipal/sceneId/{krpano-relative-path}
+            // Final S3 URLs: https://.../{municipal}/{sceneId}/{krpano-relative-path}
             $thumb   = Storage::disk('s3')->url("{$basePath}/{$thumbRel}");
             $preview = Storage::disk('s3')->url("{$basePath}/{$previewRel}");
             $cubeUrl = Storage::disk('s3')->url("{$basePath}/{$cubeRel}");
@@ -132,7 +186,7 @@ class SceneController extends Controller
         // CLEAN TEMP
         $this->deleteLocalFolder($tempDir);
 
-        // UPDATE tour.xml + layer (use krpano's real cube url + multires) — MUNICIPAL-AWARE
+        // UPDATE tour.xml + layer (use krpano's real cube url + multires) — MUNICIPAL-AWARE (on S3)
         $this->appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
 
         return redirect()->route('Dashboard')->with('success', 'Scene uploaded!');
@@ -162,7 +216,7 @@ class SceneController extends Controller
         $validated['tiktok']          = $request->tiktok;
         $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
-        // If no new panorama uploaded → just update meta + xml layer/scene
+        // If no new panorama uploaded → just update meta + xml layer/scene (on S3)
         if (!$request->hasFile('panorama')) {
             $scene->update($validated);
 
@@ -176,7 +230,7 @@ class SceneController extends Controller
             try {
                 $this->updateSceneMetaInXml($sceneId, $validated, $municipalSlug);
                 $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
-                Log::info('✏️ Updated scene + layer meta in tour.xml (no retiling)', [
+                Log::info('✏️ Updated scene + layer meta in tour.xml on S3 (no retiling)', [
                     'sceneId'       => $sceneId,
                     'municipalSlug' => $municipalSlug,
                 ]);
@@ -283,11 +337,11 @@ class SceneController extends Controller
         // CLEANUP LOCAL
         $this->deleteLocalFolder($tempDir);
 
-        // REMOVE OLD XML + LAYER from OLD MUNICIPAL
+        // REMOVE OLD XML + LAYER from OLD MUNICIPAL (on S3)
         $this->removeSceneFromXml($oldSceneId, $oldMunicipalSlug);
         $this->removeLayerFromXml($oldSceneId, $oldMunicipalSlug);
 
-        // INSERT NEW XML BLOCK + LAYER (with real cube + multires) in NEW MUNICIPAL
+        // INSERT NEW XML BLOCK + LAYER (with real cube + multires) in NEW MUNICIPAL (on S3)
         $this->appendSceneToXml($newSceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
 
         $scene->update($validated);
@@ -311,10 +365,10 @@ class SceneController extends Controller
 
             Log::info('🗑 Deleting scene', [
                 'sceneId'      => $sceneId,
-                'folderPrefix' => $folderPrefix
+                'folderPrefix' => $folderPrefix,
             ]);
 
-            // REMOVE XML + LAYER from this municipal tour.xml
+            // REMOVE XML + LAYER from this municipal tour.xml (on S3)
             $this->removeSceneFromXml($sceneId, $municipalSlug);
             $this->removeLayerFromXml($sceneId, $municipalSlug);
 
@@ -585,21 +639,14 @@ class SceneController extends Controller
     }
 
     // =====================================================================
-    // APPEND SCENE TO XML  (MUNICIPAL-AWARE)
+    // APPEND SCENE TO XML  (MUNICIPAL-AWARE, S3)
     // =====================================================================
     private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-
-        if (!file_exists($tourXml)) {
-            Log::error('❌ tour.xml not found when appending scene', [
-                'path'          => $tourXml,
-                'municipalSlug' => $municipalSlug,
-            ]);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) {
             return;
         }
-
-        $xml = file_get_contents($tourXml);
 
         $title    = htmlspecialchars($validated['title'], ENT_QUOTES);
         $subtitle = htmlspecialchars($validated['location'], ENT_QUOTES);
@@ -615,21 +662,20 @@ class SceneController extends Controller
 
         if (strpos($xml, '</krpano>') === false) {
             Log::error('❌ Invalid tour.xml: missing </krpano> tag', [
-                'path'          => $tourXml,
                 'municipalSlug' => $municipalSlug,
             ]);
             return;
         }
 
         $xml = str_replace('</krpano>', $newScene . '</krpano>', $xml);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info('🧩 Scene appended to tour.xml', [
+        Log::info('🧩 Scene appended to tour.xml (S3)', [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
 
-        // LAYER + META INJECTIONS (municipality-aware)
+        // LAYER + META INJECTIONS (municipality-aware on S3)
         $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
         $this->appendMapToSideMapLayerXml(
             $validated['google_map_link'] ?? null,
@@ -709,25 +755,16 @@ class SceneController extends Controller
     }
 
     // =====================================================================
-    // LAYER INJECTION SA LAYER THUMBS (MUNICIPAL-AWARE)
+    // LAYER INJECTION SA THUMBS (MUNICIPAL-AWARE, S3)
     // =====================================================================
     private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug)
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) {
-            Log::error('❌ tour.xml not found when appending layer', [
-                'path'          => $tourXml,
-                'municipalSlug' => $municipalSlug,
-            ]);
-            return;
-        }
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $text      = strtoupper(str_replace('_', ' ', $sceneTitle));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
 
-        // 🔥 The new layer to inject
         $layer = "
 <layer name=\"{$safeTitle}\" 
     url=\"{$thumb}\" 
@@ -741,7 +778,6 @@ class SceneController extends Controller
 </layer>
 ";
 
-        // 🔎 Find the TOPNI container opening tag
         $pattern = '/(<layer\b[^>]*name="topni"[^>]*>)/i';
 
         if (!preg_match($pattern, $xml, $match)) {
@@ -751,24 +787,20 @@ class SceneController extends Controller
             return;
         }
 
-        // ✔ Opening tag only (no children)
         $openingTag = $match[1];
-
-        // 🔥 Insert the layer BELOW the opening <layer name="topni">
         $replacement = $openingTag . "\n" . $layer;
 
-        // Replace only the first occurrence
         $xml = preg_replace($pattern, $replacement, $xml, 1);
 
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🧩 Layer injected under TOPNI for scene {$sceneId}", [
+        Log::info("🧩 Layer injected under TOPNI for scene {$sceneId} (S3)", [
             'municipalSlug' => $municipalSlug,
         ]);
     }
 
     // =====================================================================
-    // LAYER INJECTION SA MAP (MUNICIPAL-AWARE)
+    // LAYER INJECTION SA MAP (MUNICIPAL-AWARE, S3)
     // =====================================================================
     private function appendMapToSideMapLayerXml($googleMapSrc, $title, $sceneId, $municipalSlug)
     {
@@ -781,19 +813,9 @@ class SceneController extends Controller
         }
 
         $title = htmlspecialchars($title, ENT_QUOTES);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) {
-            Log::error("❌ sidemap injection failed, tour.xml not found", [
-                'path'          => $tourXml,
-                'municipalSlug' => $municipalSlug,
-            ]);
-            return;
-        }
-
-        $xml = file_get_contents($tourXml);
-
-        // Match the opening sidemap layer tag ONLY
         $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
 
         if (!preg_match($pattern, $xml, $match)) {
@@ -805,7 +827,6 @@ class SceneController extends Controller
 
         $openingTag = $match[1];
 
-        // The iframe to inject under sidemap
         $iframeLayer = "
     <layer 
         name=\"iframeLayer_{$title}\"
@@ -821,15 +842,13 @@ class SceneController extends Controller
     />
     ";
 
-        // Insert BELOW the opening <layer name="sidemap">
         $replacement = $openingTag . "\n" . $iframeLayer;
 
-        // Replace only the first match
         $xml = preg_replace($pattern, $replacement, $xml, 1);
 
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🗺️ Google Map iframe injected right under sidemap tag.", [
+        Log::info("🗺️ Google Map iframe injected right under sidemap tag. (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -840,13 +859,9 @@ class SceneController extends Controller
         if (!$title) return;
 
         $title = htmlspecialchars($title, ENT_QUOTES);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
-
-        // Match only the opening tag of scrollarea6
         $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
 
         if (!preg_match($pattern, $xml, $match)) {
@@ -858,7 +873,6 @@ class SceneController extends Controller
 
         $openingTag = $match[1];
 
-        // Your layer to insert **directly under scrollarea6**
         $titleLayer = "
     <layer 
         name=\"Title_text_{$title}\"
@@ -878,14 +892,12 @@ class SceneController extends Controller
  </layer>
     ";
 
-        // Insert layer right after the opening scrollarea6 tag
         $replacement = $openingTag . "\n" . $titleLayer;
-
         $xml = str_replace($openingTag, $replacement, $xml);
 
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🏷️ Title text inserted UNDER scrollarea6", [
+        Log::info("🏷️ Title text inserted UNDER scrollarea6 (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -898,10 +910,8 @@ class SceneController extends Controller
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forbarangay";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -930,9 +940,9 @@ class SceneController extends Controller
         $replacement = $openingTag . "\n" . $barangayLayer;
 
         $xml = preg_replace($pattern, $replacement, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🏘️ Barangay text inserted", [
+        Log::info("🏘️ Barangay text inserted (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -945,10 +955,8 @@ class SceneController extends Controller
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forcat";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -977,9 +985,9 @@ class SceneController extends Controller
         $replacement = $openingTag . "\n" . $categoryLayer;
 
         $xml = preg_replace($pattern, $replacement, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🏷️ Category text inserted", [
+        Log::info("🏷️ Category text inserted (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -992,10 +1000,8 @@ class SceneController extends Controller
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "scrollarea5";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1024,9 +1030,9 @@ class SceneController extends Controller
         $replacement = $openingTag . "\n" . $detailsLayer;
 
         $xml = preg_replace($pattern, $replacement, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("📄 Address/details text inserted", [
+        Log::info("📄 Address/details text inserted (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1039,10 +1045,8 @@ class SceneController extends Controller
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forphone";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1074,9 +1078,9 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $contactLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("📞 Contact number inserted under forphone", [
+        Log::info("📞 Contact number inserted under forphone (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1089,10 +1093,8 @@ class SceneController extends Controller
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "formail";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1124,9 +1126,9 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $emailLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("📧 Email inserted under formail", [
+        Log::info("📧 Email inserted under formail (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1139,10 +1141,8 @@ class SceneController extends Controller
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forwebsite";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1171,9 +1171,9 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $websiteLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🌐 Website inserted under forwebsite", [
+        Log::info("🌐 Website inserted under forwebsite (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1186,10 +1186,8 @@ class SceneController extends Controller
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forfb";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1218,9 +1216,9 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $facebookLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("📘 Facebook inserted under forfb", [
+        Log::info("📘 Facebook inserted under forfb (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1233,10 +1231,8 @@ class SceneController extends Controller
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "forinsta";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1265,9 +1261,9 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $instagramLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("📸 Instagram inserted under forinsta", [
+        Log::info("📸 Instagram inserted under forinsta (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
@@ -1280,10 +1276,8 @@ class SceneController extends Controller
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $parent  = "fortiktok";
         $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
@@ -1312,40 +1306,32 @@ class SceneController extends Controller
     />";
 
         $xml = preg_replace($pattern, $openingTag . "\n" . $tiktokLayer, $xml, 1);
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("🎵 TikTok inserted under fortiktok", [
+        Log::info("🎵 TikTok inserted under fortiktok (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
     }
 
     // =====================================================================
-    // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL
+    // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL, S3
     // =====================================================================
     private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $title    = $validated['title'] ?? '';
         $subtitle = $validated['location'] ?? '';
 
-        // Update attributes inside <scene name="scene_XXXX">
         $pattern = '/(<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(>)/is';
 
         $replacement = function ($m) use ($title, $subtitle) {
             $block = $m[1];
 
-            // update title=""
             $block = preg_replace('/title="[^"]*"/', 'title="' . $title . '"', $block);
-
-            // update subtitle=""
             $block = preg_replace('/subtitle="[^"]*"/', 'subtitle="' . $subtitle . '"', $block);
-
-            // update places=""
             $block = preg_replace('/places="[^"]*"/', 'places="' . $title . '"', $block);
 
             return $block . $m[2];
@@ -1353,35 +1339,31 @@ class SceneController extends Controller
 
         $xml = preg_replace_callback($pattern, $replacement, $xml);
 
-        file_put_contents($tourXml, $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("✏️ Updated scene meta in XML", [
+        Log::info("✏️ Updated scene meta in XML (S3)", [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
     }
 
     // =====================================================================
-    // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL
+    // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3
     // =====================================================================
     private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-
-        if (!file_exists($tourXml)) {
-            Log::error('tour.xml not found', [
+        $xmlContent = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xmlContent === null) {
+            Log::error('tour.xml not found when updating layer meta (S3)', [
                 'municipalSlug' => $municipalSlug,
             ]);
             return;
         }
 
-        $xmlContent = file_get_contents($tourXml);
-
-        // Regex: find the whole <layer ...>...</layer> block for this scene
         $pattern = '/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is';
 
         if (!preg_match($pattern, $xmlContent, $matches)) {
-            Log::warning("Layer not found for scene {$sceneId}", [
+            Log::warning("Layer not found for scene {$sceneId} (S3)", [
                 'municipalSlug' => $municipalSlug,
             ]);
             return;
@@ -1389,12 +1371,10 @@ class SceneController extends Controller
 
         $originalBlock = $matches[0];
 
-        // Build updated block
         $newName     = $validated['title'] ?? '';
         $newBarangay = $validated['barangay'] ?? '';
         $textLabel   = strtoupper(str_replace('_', ' ', $newName));
 
-        // Update name=""
         $updated = preg_replace(
             '/name="[^"]*"/',
             'name="' . $newName . '"',
@@ -1402,7 +1382,6 @@ class SceneController extends Controller
             1
         );
 
-        // Update barangay=""
         $updated = preg_replace(
             '/barangay="[^"]*"/',
             'barangay="' . $newBarangay . '"',
@@ -1410,7 +1389,6 @@ class SceneController extends Controller
             1
         );
 
-        // Update inner text=""
         $updated = preg_replace(
             '/<layer[^>]*type="text"[^>]*text="[^"]*"/',
             '<layer type="text" text="' . $textLabel . '"',
@@ -1418,45 +1396,41 @@ class SceneController extends Controller
             1
         );
 
-        // Replace old block with new one
         $xmlContent = str_replace($originalBlock, $updated, $xmlContent);
 
-        file_put_contents($tourXml, $xmlContent);
+        $this->saveTourXmlToS3($municipalSlug, $xmlContent);
 
-        Log::info("Updated layer meta for scene {$sceneId}", [
+        Log::info("Updated layer meta for scene {$sceneId} (S3)", [
             'municipalSlug' => $municipalSlug,
         ]);
     }
 
     // =====================================================================
-    // REMOVE SCENE FROM XML — MUNICIPAL
+    // REMOVE SCENE FROM XML — MUNICIPAL, S3
     // =====================================================================
     private function removeSceneFromXml($sceneId, string $municipalSlug)
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $pattern = '/<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/scene>\s*/is';
         $new     = preg_replace($pattern, '', $xml);
 
-        file_put_contents($tourXml, $new);
-        Log::info('🧹 Scene removed from tour.xml', [
+        $this->saveTourXmlToS3($municipalSlug, $new);
+
+        Log::info('🧹 Scene removed from tour.xml (S3)', [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
     }
 
     // =====================================================================
-    // REMOVE LAYER FROM XML — MUNICIPAL
+    // REMOVE LAYER FROM XML — MUNICIPAL, S3
     // =====================================================================
     private function removeLayerFromXml($sceneId, string $municipalSlug)
     {
-        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
-        if (!file_exists($tourXml)) return;
-
-        $xml = file_get_contents($tourXml);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
 
         $pattern = '/
         <layer\b[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*\/>   
@@ -1464,13 +1438,13 @@ class SceneController extends Controller
         <layer\b[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>      
         (?:.*?)                                                                         
         <\/layer>                                                                       
-    /isx'; // x = free-spacing mode for readability
+    /isx';
 
         $updatedXml = preg_replace($pattern, '', $xml);
 
-        file_put_contents($tourXml, $updatedXml);
+        $this->saveTourXmlToS3($municipalSlug, $updatedXml);
 
-        Log::info('🧹 All layers for scene removed (supports self-closing + block)', [
+        Log::info('🧹 All layers for scene removed (supports self-closing + block, S3)', [
             'sceneId'       => $sceneId,
             'municipalSlug' => $municipalSlug,
         ]);
