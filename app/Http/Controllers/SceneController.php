@@ -20,17 +20,17 @@ class SceneController extends Controller
     }
 
     private function extractIframeSrc($iframeHtml)
-{
-    if (!$iframeHtml) return null;
+    {
+        if (!$iframeHtml) return null;
 
-    // If user pasted a full iframe, extract only src=""
-    if (preg_match('/src=["\']([^"\']+)["\']/', $iframeHtml, $match)) {
-        return $match[1];
+        // If user pasted a full iframe, extract only src=""
+        if (preg_match('/src=["\']([^"\']+)["\']/', $iframeHtml, $match)) {
+            return $match[1];
+        }
+
+        // If no iframe detected, return raw input (normal URL)
+        return $iframeHtml;
     }
-
-    // If no iframe detected, return raw input (normal URL)
-    return $iframeHtml;
-}
 
     // -----------------------------------------------------------
     // STORE
@@ -45,7 +45,7 @@ class SceneController extends Controller
         $validated['facebook']        = $request->facebook;
         $validated['instagram']       = $request->instagram;
         $validated['tiktok']          = $request->tiktok;
-        $validated['is_published'] = $validated['is_published'] === "true" ? 1 : 0;
+        $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
         $file = $request->file('panorama');
         $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
@@ -66,11 +66,11 @@ class SceneController extends Controller
         $file->move($tempDir, $filename);
 
         Log::info('🎞️ Scene upload started', [
-            'sceneId'      => $sceneId,
-            'municipalSlug'=> $municipalSlug,
-            'tempDir'      => $tempDir,
-            'tempPanorama' => $tempPanorama,
-            's3_base_path' => $basePath,
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+            'tempDir'       => $tempDir,
+            'tempPanorama'  => $tempPanorama,
+            's3_base_path'  => $basePath,
         ]);
 
         // ✅ Upload original panorama to S3 (so panorama_path actually exists there)
@@ -132,8 +132,8 @@ class SceneController extends Controller
         // CLEAN TEMP
         $this->deleteLocalFolder($tempDir);
 
-        // UPDATE tour.xml + layer (use krpano's real cube url + multires)
-        $this->appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires);
+        // UPDATE tour.xml + layer (use krpano's real cube url + multires) — MUNICIPAL-AWARE
+        $this->appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
 
         return redirect()->route('Dashboard')->with('success', 'Scene uploaded!');
     }
@@ -160,33 +160,36 @@ class SceneController extends Controller
         $validated['facebook']        = $request->facebook;
         $validated['instagram']       = $request->instagram;
         $validated['tiktok']          = $request->tiktok;
-        $validated['is_published'] = $validated['is_published'] === "true" ? 1 : 0;
+        $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
-        // If no new panorama uploaded → just update meta
         // If no new panorama uploaded → just update meta + xml layer/scene
-if (!$request->hasFile('panorama')) {
-    $scene->update($validated);
+        if (!$request->hasFile('panorama')) {
+            $scene->update($validated);
 
-    // derive sceneId from existing panorama_path (S3 URL)
-    $path = parse_url($scene->panorama_path, PHP_URL_PATH) ?? $scene->panorama_path;
-    $sceneId = pathinfo($path, PATHINFO_FILENAME);
+            // derive sceneId from existing panorama_path (S3 URL)
+            $path = parse_url($scene->panorama_path, PHP_URL_PATH) ?? $scene->panorama_path;
+            $sceneId = pathinfo($path, PATHINFO_FILENAME);
 
-    try {
-        $this->updateSceneMetaInXml($sceneId, $validated);
-        $this->updateLayerMetaInXml($sceneId, $validated);
-        Log::info('✏️ Updated scene + layer meta in tour.xml (no retiling)', [
-            'sceneId' => $sceneId,
-        ]);
-    } catch (\Throwable $e) {
-        Log::error('❌ Failed to update tour.xml meta on scene update', [
-            'sceneId' => $sceneId,
-            'error'   => $e->getMessage(),
-        ]);
-    }
+            // Use the MUNICIPAL of the existing scene for XML
+            $municipalSlug = $this->municipalSlug($scene->municipal);
 
-    return redirect()->route('Dashboard')->with('success', 'Scene updated.');
-}
+            try {
+                $this->updateSceneMetaInXml($sceneId, $validated, $municipalSlug);
+                $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
+                Log::info('✏️ Updated scene + layer meta in tour.xml (no retiling)', [
+                    'sceneId'       => $sceneId,
+                    'municipalSlug' => $municipalSlug,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('❌ Failed to update tour.xml meta on scene update', [
+                    'sceneId'       => $sceneId,
+                    'municipalSlug' => $municipalSlug,
+                    'error'         => $e->getMessage(),
+                ]);
+            }
 
+            return redirect()->route('Dashboard')->with('success', 'Scene updated.');
+        }
 
         $oldSceneId       = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
         $oldMunicipal     = $scene->municipal;
@@ -195,15 +198,16 @@ if (!$request->hasFile('panorama')) {
         // DELETE OLD S3 DIRECTORY
         Storage::disk('s3')->deleteDirectory("{$oldMunicipalSlug}/{$oldSceneId}");
         Log::info('🗑 Deleted old S3 directory for scene update', [
-            'sceneId'      => $oldSceneId,
-            'municipalSlug'=> $oldMunicipalSlug,
+            'sceneId'       => $oldSceneId,
+            'municipalSlug' => $oldMunicipalSlug,
         ]);
 
         // NEW FILE
-        $file = $request->file('panorama');
+        $file       = $request->file('panorama');
         $filename   = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
         $newSceneId = pathinfo($filename, PATHINFO_FILENAME);
 
+        // NEW municipalSlug (could be same or different)
         $municipalSlug = $this->municipalSlug($validated['municipal']);
         $basePath      = "{$municipalSlug}/{$newSceneId}";
 
@@ -279,12 +283,12 @@ if (!$request->hasFile('panorama')) {
         // CLEANUP LOCAL
         $this->deleteLocalFolder($tempDir);
 
-        // REMOVE OLD XML + LAYER
-        $this->removeSceneFromXml($oldSceneId);
-        $this->removeLayerFromXml($oldSceneId);
+        // REMOVE OLD XML + LAYER from OLD MUNICIPAL
+        $this->removeSceneFromXml($oldSceneId, $oldMunicipalSlug);
+        $this->removeLayerFromXml($oldSceneId, $oldMunicipalSlug);
 
-        // INSERT NEW XML BLOCK + LAYER (with real cube + multires)
-        $this->appendSceneToXml($newSceneId, $validated, $thumb, $preview, $cubeUrl, $multires);
+        // INSERT NEW XML BLOCK + LAYER (with real cube + multires) in NEW MUNICIPAL
+        $this->appendSceneToXml($newSceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
 
         $scene->update($validated);
 
@@ -295,59 +299,59 @@ if (!$request->hasFile('panorama')) {
     // DESTROY
     // -----------------------------------------------------------
     public function destroy($id)
-{
-    try {
-        $scene = Scene::findOrFail($id);
+    {
+        try {
+            $scene = Scene::findOrFail($id);
 
-        $path = parse_url($scene->panorama_path, PHP_URL_PATH) ?: $scene->panorama_path;
-        $sceneId = pathinfo($path, PATHINFO_FILENAME);
-        $municipalSlug = $this->municipalSlug($scene->municipal);
+            $path    = parse_url($scene->panorama_path, PHP_URL_PATH) ?: $scene->panorama_path;
+            $sceneId = pathinfo($path, PATHINFO_FILENAME);
+            $municipalSlug = $this->municipalSlug($scene->municipal);
 
-        $folderPrefix = "{$municipalSlug}/{$sceneId}";
+            $folderPrefix = "{$municipalSlug}/{$sceneId}";
 
-        Log::info('🗑 Deleting scene', [
-            'sceneId'      => $sceneId,
-            'folderPrefix' => $folderPrefix
-        ]);
+            Log::info('🗑 Deleting scene', [
+                'sceneId'      => $sceneId,
+                'folderPrefix' => $folderPrefix
+            ]);
 
-        // REMOVE XML + LAYER
-        $this->removeSceneFromXml($sceneId);
-        $this->removeLayerFromXml($sceneId);
+            // REMOVE XML + LAYER from this municipal tour.xml
+            $this->removeSceneFromXml($sceneId, $municipalSlug);
+            $this->removeLayerFromXml($sceneId, $municipalSlug);
 
-        // DELETE ALL S3 FILES & FOLDERS
-        $this->forceDeleteS3Directory($folderPrefix);
+            // DELETE ALL S3 FILES & FOLDERS
+            $this->forceDeleteS3Directory($folderPrefix);
 
-        // DELETE DB
-        $scene->delete();
+            // DELETE DB
+            $scene->delete();
 
-        return redirect()->route('Dashboard')->with('success', 'Scene deleted.');
-    } catch (\Exception $e) {
-        Log::error("❌ DELETE FAILED: " . $e->getMessage());
-        return back()->with('error', 'Failed to delete scene!');
-    }
-}
-
-private function forceDeleteS3Directory(string $prefix)
-{
-    $s3 = Storage::disk('s3');
-
-    // Normalize prefix (remove accidental double slashes)
-    $prefix = trim($prefix, '/');
-
-    // List ALL objects under folder
-    $objects = $s3->listContents($prefix, true);
-
-    foreach ($objects as $file) {
-        if ($file['type'] === 'file') {
-            $s3->delete($file['path']);
+            return redirect()->route('Dashboard')->with('success', 'Scene deleted.');
+        } catch (\Exception $e) {
+            Log::error("❌ DELETE FAILED: " . $e->getMessage());
+            return back()->with('error', 'Failed to delete scene!');
         }
     }
 
-    // Finally remove folder itself
-    $s3->deleteDirectory($prefix);
+    private function forceDeleteS3Directory(string $prefix)
+    {
+        $s3 = Storage::disk('s3');
 
-    Log::info("🧹 FORCE DELETED S3 directory", ['prefix' => $prefix]);
-}
+        // Normalize prefix (remove accidental double slashes)
+        $prefix = trim($prefix, '/');
+
+        // List ALL objects under folder
+        $objects = $s3->listContents($prefix, true);
+
+        foreach ($objects as $file) {
+            if ($file['type'] === 'file') {
+                $s3->delete($file['path']);
+            }
+        }
+
+        // Finally remove folder itself
+        $s3->deleteDirectory($prefix);
+
+        Log::info("🧹 FORCE DELETED S3 directory", ['prefix' => $prefix]);
+    }
 
     // =====================================================================
     // VALIDATION
@@ -355,12 +359,12 @@ private function forceDeleteS3Directory(string $prefix)
     private function validateScene($request, $updating = false)
     {
         return $request->validate([
-            'title'        => 'required|string|max:255',
-            'municipal'    => 'required|string|max:255',
-            'location'     => 'nullable|string|max:255',
-            'barangay'     => 'nullable|string|max:255',
-            'category'     => 'nullable|string|max:255',
-            'address'      => 'nullable|string|max:255',
+            'title'           => 'required|string|max:255',
+            'municipal'       => 'required|string|max:255',
+            'location'        => 'nullable|string|max:255',
+            'barangay'        => 'nullable|string|max:255',
+            'category'        => 'nullable|string|max:255',
+            'address'         => 'nullable|string|max:255',
             'google_map_link' => 'nullable|string',
             'contact_number'  => 'nullable|string',
             'email'           => 'nullable|string|max:255',
@@ -368,8 +372,8 @@ private function forceDeleteS3Directory(string $prefix)
             'facebook'        => 'nullable|string|max:255',
             'instagram'       => 'nullable|string|max:255',
             'tiktok'          => 'nullable|string|max:255',
-            'is_published' => 'required',
-            'panorama'     =>
+            'is_published'    => 'required',
+            'panorama'        =>
                 $updating
                     ? 'nullable|file|mimes:jpg,jpeg'
                     : 'required|file|mimes:jpg,jpeg',
@@ -581,14 +585,17 @@ private function forceDeleteS3Directory(string $prefix)
     }
 
     // =====================================================================
-    // APPEND SCENE TO XML
+    // APPEND SCENE TO XML  (MUNICIPAL-AWARE)
     // =====================================================================
-    private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires)
+    private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
     {
-        $tourXml = public_path("vtour/tour.xml");
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
 
         if (!file_exists($tourXml)) {
-            Log::error('❌ tour.xml not found when appending scene', ['path' => $tourXml]);
+            Log::error('❌ tour.xml not found when appending scene', [
+                'path'          => $tourXml,
+                'municipalSlug' => $municipalSlug,
+            ]);
             return;
         }
 
@@ -607,95 +614,121 @@ private function forceDeleteS3Directory(string $prefix)
 </scene>\n";
 
         if (strpos($xml, '</krpano>') === false) {
-            Log::error('❌ Invalid tour.xml: missing </krpano> tag');
+            Log::error('❌ Invalid tour.xml: missing </krpano> tag', [
+                'path'          => $tourXml,
+                'municipalSlug' => $municipalSlug,
+            ]);
             return;
         }
 
         $xml = str_replace('</krpano>', $newScene . '</krpano>', $xml);
         file_put_contents($tourXml, $xml);
 
-        Log::info('🧩 Scene appended to tour.xml', ['sceneId' => $sceneId]);
+        Log::info('🧩 Scene appended to tour.xml', [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
 
-        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb);
+        // LAYER + META INJECTIONS (municipality-aware)
+        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
         $this->appendMapToSideMapLayerXml(
             $validated['google_map_link'] ?? null,
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
 
         $this->appendTitle(
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
-
 
         $this->appendBarangayInsideForBarangay(
             $validated['barangay'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
 
         $this->appendCategoryInsideForCat(
             $validated['category'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
+
         $this->appenddetailsInsidescrollarea5(
             $validated['address'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
+
         $this->appendcontactnumber(
             $validated['contact_number'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
+
         $this->appendemail(
             $validated['email'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
+
         $this->appendwebsite(
             $validated['website'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
-         $this->appendfacebook(
+
+        $this->appendfacebook(
             $validated['facebook'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
-         $this->appendinstagram(
+
+        $this->appendinstagram(
             $validated['instagram'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
-         $this->appendtiktok(
+
+        $this->appendtiktok(
             $validated['tiktok'] ?? '',
             $validated['title'] ?? '',
-            $sceneId
+            $sceneId,
+            $municipalSlug
         );
-        
     }
 
     // =====================================================================
-    // LAYER INJECTION SA LAYER THUMBS
+    // LAYER INJECTION SA LAYER THUMBS (MUNICIPAL-AWARE)
     // =====================================================================
-   private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb)
-{
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) {
-        Log::error('❌ tour.xml not found when appending layer', ['path' => $tourXml]);
-        return;
-    }
+    private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug)
+    {
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) {
+            Log::error('❌ tour.xml not found when appending layer', [
+                'path'          => $tourXml,
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
 
-    $xml = file_get_contents($tourXml);
+        $xml = file_get_contents($tourXml);
 
-    $text = strtoupper(str_replace('_', ' ', $sceneTitle));
-    $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $text      = strtoupper(str_replace('_', ' ', $sceneTitle));
+        $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
 
-    // 🔥 The new layer to inject
-    $layer = "
+        // 🔥 The new layer to inject
+        $layer = "
 <layer name=\"{$safeTitle}\" 
     url=\"{$thumb}\" 
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
@@ -708,57 +741,72 @@ private function forceDeleteS3Directory(string $prefix)
 </layer>
 ";
 
-    // 🔎 Find the TOPNI container opening tag
-    $pattern = '/(<layer\b[^>]*name="topni"[^>]*>)/i';
+        // 🔎 Find the TOPNI container opening tag
+        $pattern = '/(<layer\b[^>]*name="topni"[^>]*>)/i';
 
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::warning("⚠️ 'topni' layer not found — skipping thumbnail injection");
-        return;
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::warning("⚠️ 'topni' layer not found — skipping thumbnail injection", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        // ✔ Opening tag only (no children)
+        $openingTag = $match[1];
+
+        // 🔥 Insert the layer BELOW the opening <layer name="topni">
+        $replacement = $openingTag . "\n" . $layer;
+
+        // Replace only the first occurrence
+        $xml = preg_replace($pattern, $replacement, $xml, 1);
+
+        file_put_contents($tourXml, $xml);
+
+        Log::info("🧩 Layer injected under TOPNI for scene {$sceneId}", [
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    // ✔ Opening tag only (no children)
-    $openingTag = $match[1];
-
-    // 🔥 Insert the layer BELOW the opening <layer name="topni">
-    $replacement = $openingTag . "\n" . $layer;
-
-    // Replace only the first occurrence
-    $xml = preg_replace($pattern, $replacement, $xml, 1);
-
-    file_put_contents($tourXml, $xml);
-
-    Log::info("🧩 Layer injected under TOPNI for scene {$sceneId}");
-}
     // =====================================================================
-    // LAYER INJECTION SA MAP
+    // LAYER INJECTION SA MAP (MUNICIPAL-AWARE)
     // =====================================================================
+    private function appendMapToSideMapLayerXml($googleMapSrc, $title, $sceneId, $municipalSlug)
+    {
+        if (!$googleMapSrc) {
+            Log::info("ℹ️ No google_map_link provided — skipping sidemap iframe injection.", [
+                'sceneId'       => $sceneId,
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
 
-  private function appendMapToSideMapLayerXml($googleMapSrc, $title, $sceneId)
-{
-    if (!$googleMapSrc) {
-        Log::info("ℹ️ No google_map_link provided — skipping sidemap iframe injection.");
-        return;
-    }
+        $title = htmlspecialchars($title, ENT_QUOTES);
 
-    $title = htmlspecialchars($title, ENT_QUOTES);
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) {
+            Log::error("❌ sidemap injection failed, tour.xml not found", [
+                'path'          => $tourXml,
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
 
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
+        $xml = file_get_contents($tourXml);
 
-    $xml = file_get_contents($tourXml);
+        // Match the opening sidemap layer tag ONLY
+        $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
 
-    // Match the opening sidemap layer tag ONLY
-    $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ sidemap layer not found in XML", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
 
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ sidemap layer not found in XML");
-        return;
-    }
+        $openingTag = $match[1];
 
-    $openingTag = $match[1];
-
-    // The iframe to inject under sidemap
-    $iframeLayer = "
+        // The iframe to inject under sidemap
+        $iframeLayer = "
     <layer 
         name=\"iframeLayer_{$title}\"
         type=\"iframe\"
@@ -773,40 +821,45 @@ private function forceDeleteS3Directory(string $prefix)
     />
     ";
 
-    // Insert BELOW the opening <layer name="sidemap">
-    $replacement = $openingTag . "\n" . $iframeLayer;
+        // Insert BELOW the opening <layer name="sidemap">
+        $replacement = $openingTag . "\n" . $iframeLayer;
 
-    // Replace only the first match
-    $xml = preg_replace($pattern, $replacement, $xml, 1);
+        // Replace only the first match
+        $xml = preg_replace($pattern, $replacement, $xml, 1);
 
-    file_put_contents($tourXml, $xml);
-    
-    Log::info("🗺️ Google Map iframe injected right under sidemap tag.");
-}
+        file_put_contents($tourXml, $xml);
 
-private function appendTitle($title, $sceneId)
-{
-    if (!$title) return;
-
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    // Match only the opening tag of scrollarea6
-    $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ scrollarea6 not found");
-        return;
+        Log::info("🗺️ Google Map iframe injected right under sidemap tag.", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendTitle($title, $sceneId, $municipalSlug)
+    {
+        if (!$title) return;
 
-    // Your layer to insert **directly under scrollarea6**
-    $titleLayer = "
+        $title = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        // Match only the opening tag of scrollarea6
+        $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ scrollarea6 not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        // Your layer to insert **directly under scrollarea6**
+        $titleLayer = "
     <layer 
         name=\"Title_text_{$title}\"
         type=\"text\"
@@ -825,38 +878,39 @@ private function appendTitle($title, $sceneId)
  </layer>
     ";
 
-    // Insert layer right after the opening scrollarea6 tag
-    $replacement = $openingTag . "\n" . $titleLayer;
+        // Insert layer right after the opening scrollarea6 tag
+        $replacement = $openingTag . "\n" . $titleLayer;
 
-    $xml = str_replace($openingTag, $replacement, $xml);
+        $xml = str_replace($openingTag, $replacement, $xml);
 
-    file_put_contents($tourXml, $xml);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("🏷️ Title text inserted UNDER scrollarea6");
-}
+        Log::info("🏷️ Title text inserted UNDER scrollarea6", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
 
+    private function appendBarangayInsideForBarangay($barangay, $title, $sceneId, $municipalSlug)
+    {
+        if (!$barangay) return;
 
+        $barangay = htmlspecialchars($barangay, ENT_QUOTES);
+        $title    = htmlspecialchars($title, ENT_QUOTES);
 
-private function appendBarangayInsideForBarangay($barangay, $title, $sceneId)
-{
-    if (!$barangay) return;
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
 
-    $barangay = htmlspecialchars($barangay, ENT_QUOTES);
-    $title    = htmlspecialchars($title, ENT_QUOTES);
+        $xml = file_get_contents($tourXml);
 
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
+        $parent  = "forbarangay";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
 
-    $xml = file_get_contents($tourXml);
+        if (!preg_match($pattern, $xml, $match)) return;
 
-    $parent = "forbarangay";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+        $openingTag = $match[1];
 
-    if (!preg_match($pattern, $xml, $match)) return;
-
-    $openingTag = $match[1];
-
-    $barangayLayer = "
+        $barangayLayer = "
     <layer 
         name=\"barangay_text_{$barangay}\"
         type=\"text\"
@@ -873,32 +927,37 @@ private function appendBarangayInsideForBarangay($barangay, $title, $sceneId)
         css=\"color:#000000; font-size:150%; font-family:Chewy; text-align:left;\"
     />";
 
-    $replacement = $openingTag . "\n" . $barangayLayer;
+        $replacement = $openingTag . "\n" . $barangayLayer;
 
-    $xml = preg_replace($pattern, $replacement, $xml, 1);
-    file_put_contents($tourXml, $xml);
-}
+        $xml = preg_replace($pattern, $replacement, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-private function appendCategoryInsideForCat($category, $title, $sceneId)
-{
-    if (!$category) return;
+        Log::info("🏘️ Barangay text inserted", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
 
-    $category = htmlspecialchars($category, ENT_QUOTES);
-    $title    = htmlspecialchars($title, ENT_QUOTES);
+    private function appendCategoryInsideForCat($category, $title, $sceneId, $municipalSlug)
+    {
+        if (!$category) return;
 
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
+        $category = htmlspecialchars($category, ENT_QUOTES);
+        $title    = htmlspecialchars($title, ENT_QUOTES);
 
-    $xml = file_get_contents($tourXml);
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
 
-    $parent = "forcat";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+        $xml = file_get_contents($tourXml);
 
-    if (!preg_match($pattern, $xml, $match)) return;
+        $parent  = "forcat";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
 
-    $openingTag = $match[1];
+        if (!preg_match($pattern, $xml, $match)) return;
 
-    $categoryLayer = "
+        $openingTag = $match[1];
+
+        $categoryLayer = "
     <layer 
         name=\"category_text_{$title}\"
         type=\"text\"
@@ -915,33 +974,37 @@ private function appendCategoryInsideForCat($category, $title, $sceneId)
         css=\"color:#000000; font-size:150%; font-family:Chewy; text-align:left;\"
     />";
 
-    $replacement = $openingTag . "\n" . $categoryLayer;
+        $replacement = $openingTag . "\n" . $categoryLayer;
 
-    $xml = preg_replace($pattern, $replacement, $xml, 1);
-    file_put_contents($tourXml, $xml);
-}
+        $xml = preg_replace($pattern, $replacement, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
+        Log::info("🏷️ Category text inserted", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
 
-private function appenddetailsInsidescrollarea5($address, $title, $sceneId)
-{
-    if (!$address) return;
+    private function appenddetailsInsidescrollarea5($address, $title, $sceneId, $municipalSlug)
+    {
+        if (!$address) return;
 
-    $address = htmlspecialchars($address, ENT_QUOTES);
-    $title   = htmlspecialchars($title, ENT_QUOTES);
+        $address = htmlspecialchars($address, ENT_QUOTES);
+        $title   = htmlspecialchars($title, ENT_QUOTES);
 
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
 
-    $xml = file_get_contents($tourXml);
+        $xml = file_get_contents($tourXml);
 
-    $parent = "scrollarea5";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+        $parent  = "scrollarea5";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
 
-    if (!preg_match($pattern, $xml, $match)) return;
+        if (!preg_match($pattern, $xml, $match)) return;
 
-    $openingTag = $match[1];
+        $openingTag = $match[1];
 
-    $detailsLayer = "
+        $detailsLayer = "
     <layer 
         name=\"details_text_{$title}\"
         type=\"text\"
@@ -958,35 +1021,42 @@ private function appenddetailsInsidescrollarea5($address, $title, $sceneId)
         linkedscene=\"scene_{$sceneId}\"
     />";
 
-    $replacement = $openingTag . "\n" . $detailsLayer;
+        $replacement = $openingTag . "\n" . $detailsLayer;
 
-    $xml = preg_replace($pattern, $replacement, $xml, 1);
-    file_put_contents($tourXml, $xml);
-}
+        $xml = preg_replace($pattern, $replacement, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-private function appendcontactnumber($contact_number, $title, $sceneId)
-{
-    if (!$contact_number) return;
-
-    $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "forphone";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ forphone layer not found");
-        return;
+        Log::info("📄 Address/details text inserted", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendcontactnumber($contact_number, $title, $sceneId, $municipalSlug)
+    {
+        if (!$contact_number) return;
 
-    $contactLayer = "
+        $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
+        $title          = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "forphone";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ forphone layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $contactLayer = "
     <layer 
         name=\"number_text_{$title}\"
         type=\"text\"
@@ -1003,35 +1073,40 @@ private function appendcontactnumber($contact_number, $title, $sceneId)
         linkedscene=\"scene_{$sceneId}\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $contactLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $contactLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("📞 Contact number inserted under forphone");
-}
-
-private function appendemail($email, $title, $sceneId)
-{
-    if (!$email) return;
-
-    $email = htmlspecialchars($email, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "formail";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ formail layer not found");
-        return;
+        Log::info("📞 Contact number inserted under forphone", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendemail($email, $title, $sceneId, $municipalSlug)
+    {
+        if (!$email) return;
 
-    $emailLayer = "
+        $email = htmlspecialchars($email, ENT_QUOTES);
+        $title = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "formail";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ formail layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $emailLayer = "
     <layer 
         name=\"email_text_{$title}\"
         type=\"text\"
@@ -1048,36 +1123,40 @@ private function appendemail($email, $title, $sceneId)
         linkedscene=\"scene_{$sceneId}\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $emailLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $emailLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("📧 Email inserted under formail");
-}
-
-
-private function appendwebsite($website, $title, $sceneId)
-{
-    if (!$website) return;
-
-    $website = htmlspecialchars($website, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "forwebsite";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ forwebsite layer not found");
-        return;
+        Log::info("📧 Email inserted under formail", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendwebsite($website, $title, $sceneId, $municipalSlug)
+    {
+        if (!$website) return;
 
-    $websiteLayer = "
+        $website = htmlspecialchars($website, ENT_QUOTES);
+        $title   = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "forwebsite";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ forwebsite layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $websiteLayer = "
     <layer 
         name=\"website_text_{$website}\"
         url=\"skin/browse.png\"
@@ -1091,36 +1170,40 @@ private function appendwebsite($website, $title, $sceneId)
         onclick=\"openurl('{$website}')\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $websiteLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $websiteLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("🌐 Website inserted under forwebsite");
-}
-
-
-private function appendfacebook($facebook, $title, $sceneId)
-{
-    if (!$facebook) return;
-
-    $facebook = htmlspecialchars($facebook, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "forfb";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ forfb layer not found");
-        return;
+        Log::info("🌐 Website inserted under forwebsite", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendfacebook($facebook, $title, $sceneId, $municipalSlug)
+    {
+        if (!$facebook) return;
 
-    $facebookLayer = "
+        $facebook = htmlspecialchars($facebook, ENT_QUOTES);
+        $title    = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "forfb";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ forfb layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $facebookLayer = "
     <layer 
         name=\"facebook_text_{$facebook}\"
         url=\"skin/fb.png\"
@@ -1134,36 +1217,40 @@ private function appendfacebook($facebook, $title, $sceneId)
         onclick=\"openurl('{$facebook}')\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $facebookLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $facebookLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("📘 Facebook inserted under forfb");
-}
-
-
-private function appendinstagram($instagram, $title, $sceneId)
-{
-    if (!$instagram) return;
-
-    $instagram = htmlspecialchars($instagram, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "forinsta";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ forinsta layer not found");
-        return;
+        Log::info("📘 Facebook inserted under forfb", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendinstagram($instagram, $title, $sceneId, $municipalSlug)
+    {
+        if (!$instagram) return;
 
-    $instagramLayer = "
+        $instagram = htmlspecialchars($instagram, ENT_QUOTES);
+        $title     = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "forinsta";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ forinsta layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $instagramLayer = "
     <layer 
         name=\"instagram_text_{$instagram}\"
         url=\"skin/insta.png\"
@@ -1177,36 +1264,40 @@ private function appendinstagram($instagram, $title, $sceneId)
         onclick=\"openurl('{$instagram}')\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $instagramLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $instagramLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("📸 Instagram inserted under forinsta");
-}
-
-
-private function appendtiktok($tiktok, $title, $sceneId)
-{
-    if (!$tiktok) return;
-
-    $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
-    $title = htmlspecialchars($title, ENT_QUOTES);
-
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $parent = "fortiktok";
-    $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
-
-    if (!preg_match($pattern, $xml, $match)) {
-        Log::error("❌ fortiktok layer not found");
-        return;
+        Log::info("📸 Instagram inserted under forinsta", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $openingTag = $match[1];
+    private function appendtiktok($tiktok, $title, $sceneId, $municipalSlug)
+    {
+        if (!$tiktok) return;
 
-    $tiktokLayer = "
+        $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
+        $title  = htmlspecialchars($title, ENT_QUOTES);
+
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $parent  = "fortiktok";
+        $pattern = '/(<layer\b[^>]*name="' . $parent . '"[^>]*>)/i';
+
+        if (!preg_match($pattern, $xml, $match)) {
+            Log::error("❌ fortiktok layer not found", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $openingTag = $match[1];
+
+        $tiktokLayer = "
     <layer 
         name=\"tiktok_text_{$tiktok}\"
         url=\"skin/tiktok.png\"
@@ -1220,116 +1311,129 @@ private function appendtiktok($tiktok, $title, $sceneId)
         onclick=\"openurl('{$tiktok}')\"
     />";
 
-    $xml = preg_replace($pattern, $openingTag . "\n" . $tiktokLayer, $xml, 1);
-    file_put_contents($tourXml, $xml);
+        $xml = preg_replace($pattern, $openingTag . "\n" . $tiktokLayer, $xml, 1);
+        file_put_contents($tourXml, $xml);
 
-    Log::info("🎵 TikTok inserted under fortiktok");
-}
-
-
-
-
-// =====================================================================
-// UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES)
-// =====================================================================
-private function updateSceneMetaInXml(string $sceneId, array $validated): void
-{
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
-
-    $xml = file_get_contents($tourXml);
-
-    $title    = $validated['title'] ?? '';
-    $subtitle = $validated['location'] ?? '';
-
-    // Update attributes inside <scene name="scene_XXXX">
-    $pattern = '/(<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(>)/is';
-
-    $replacement = function ($m) use ($title, $subtitle) {
-        $block = $m[1];
-
-        // update title=""
-        $block = preg_replace('/title="[^"]*"/', 'title="' . $title . '"', $block);
-
-        // update subtitle=""
-        $block = preg_replace('/subtitle="[^"]*"/', 'subtitle="' . $subtitle . '"', $block);
-
-        // update places=""
-        $block = preg_replace('/places="[^"]*"/', 'places="' . $title . '"', $block);
-
-        return $block . $m[2];
-    };
-
-    $xml = preg_replace_callback($pattern, $replacement, $xml);
-
-    file_put_contents($tourXml, $xml);
-}
-// =====================================================================
-// UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL)
-// =====================================================================
-private function updateLayerMetaInXml(string $sceneId, array $validated): void
-{
-    $tourXml = public_path("vtour/tour.xml");
-
-    if (!file_exists($tourXml)) {
-        Log::error('tour.xml not found');
-        return;
+        Log::info("🎵 TikTok inserted under fortiktok", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
-    $xmlContent = file_get_contents($tourXml);
-
-    // Regex: find the whole <layer ...>...</layer> block for this scene
-    $pattern = '/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is';
-
-    if (!preg_match($pattern, $xmlContent, $matches)) {
-        Log::warning("Layer not found for scene {$sceneId}");
-        return;
-    }
-
-    $originalBlock = $matches[0];
-
-    // Build updated block
-    $newName     = $validated['title'] ?? '';
-    $newBarangay = $validated['barangay'] ?? '';
-    $textLabel   = strtoupper(str_replace('_', ' ', $newName));
-
-    // Update name=""
-    $updated = preg_replace(
-        '/name="[^"]*"/',
-        'name="' . $newName . '"',
-        $originalBlock,
-        1
-    );
-
-    // Update barangay=""
-    $updated = preg_replace(
-        '/barangay="[^"]*"/',
-        'barangay="' . $newBarangay . '"',
-        $updated,
-        1
-    );
-
-    // Update inner text=""
-    $updated = preg_replace(
-        '/<layer[^>]*type="text"[^>]*text="[^"]*"/',
-        '<layer type="text" text="' . $textLabel . '"',
-        $updated,
-        1
-    );
-
-    // Replace old block with new one
-    $xmlContent = str_replace($originalBlock, $updated, $xmlContent);
-
-    file_put_contents($tourXml, $xmlContent);
-
-    Log::info("Updated layer meta for scene {$sceneId}");
-}
     // =====================================================================
-    // REMOVE SCENE FROM XML
+    // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL
     // =====================================================================
-    private function removeSceneFromXml($sceneId)
+    private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
-        $tourXml = public_path("vtour/tour.xml");
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
+
+        $xml = file_get_contents($tourXml);
+
+        $title    = $validated['title'] ?? '';
+        $subtitle = $validated['location'] ?? '';
+
+        // Update attributes inside <scene name="scene_XXXX">
+        $pattern = '/(<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(>)/is';
+
+        $replacement = function ($m) use ($title, $subtitle) {
+            $block = $m[1];
+
+            // update title=""
+            $block = preg_replace('/title="[^"]*"/', 'title="' . $title . '"', $block);
+
+            // update subtitle=""
+            $block = preg_replace('/subtitle="[^"]*"/', 'subtitle="' . $subtitle . '"', $block);
+
+            // update places=""
+            $block = preg_replace('/places="[^"]*"/', 'places="' . $title . '"', $block);
+
+            return $block . $m[2];
+        };
+
+        $xml = preg_replace_callback($pattern, $replacement, $xml);
+
+        file_put_contents($tourXml, $xml);
+
+        Log::info("✏️ Updated scene meta in XML", [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
+
+    // =====================================================================
+    // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL
+    // =====================================================================
+    private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
+    {
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+
+        if (!file_exists($tourXml)) {
+            Log::error('tour.xml not found', [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $xmlContent = file_get_contents($tourXml);
+
+        // Regex: find the whole <layer ...>...</layer> block for this scene
+        $pattern = '/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is';
+
+        if (!preg_match($pattern, $xmlContent, $matches)) {
+            Log::warning("Layer not found for scene {$sceneId}", [
+                'municipalSlug' => $municipalSlug,
+            ]);
+            return;
+        }
+
+        $originalBlock = $matches[0];
+
+        // Build updated block
+        $newName     = $validated['title'] ?? '';
+        $newBarangay = $validated['barangay'] ?? '';
+        $textLabel   = strtoupper(str_replace('_', ' ', $newName));
+
+        // Update name=""
+        $updated = preg_replace(
+            '/name="[^"]*"/',
+            'name="' . $newName . '"',
+            $originalBlock,
+            1
+        );
+
+        // Update barangay=""
+        $updated = preg_replace(
+            '/barangay="[^"]*"/',
+            'barangay="' . $newBarangay . '"',
+            $updated,
+            1
+        );
+
+        // Update inner text=""
+        $updated = preg_replace(
+            '/<layer[^>]*type="text"[^>]*text="[^"]*"/',
+            '<layer type="text" text="' . $textLabel . '"',
+            $updated,
+            1
+        );
+
+        // Replace old block with new one
+        $xmlContent = str_replace($originalBlock, $updated, $xmlContent);
+
+        file_put_contents($tourXml, $xmlContent);
+
+        Log::info("Updated layer meta for scene {$sceneId}", [
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
+
+    // =====================================================================
+    // REMOVE SCENE FROM XML — MUNICIPAL
+    // =====================================================================
+    private function removeSceneFromXml($sceneId, string $municipalSlug)
+    {
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1338,21 +1442,23 @@ private function updateLayerMetaInXml(string $sceneId, array $validated): void
         $new     = preg_replace($pattern, '', $xml);
 
         file_put_contents($tourXml, $new);
-        Log::info('🧹 Scene removed from tour.xml', ['sceneId' => $sceneId]);
+        Log::info('🧹 Scene removed from tour.xml', [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
     }
 
     // =====================================================================
-    // REMOVE LAYER FROM XML
+    // REMOVE LAYER FROM XML — MUNICIPAL
     // =====================================================================
-    private function removeLayerFromXml($sceneId)
-{
-    $tourXml = public_path("vtour/tour.xml");
-    if (!file_exists($tourXml)) return;
+    private function removeLayerFromXml($sceneId, string $municipalSlug)
+    {
+        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        if (!file_exists($tourXml)) return;
 
-    $xml = file_get_contents($tourXml);
+        $xml = file_get_contents($tourXml);
 
-
-    $pattern = '/
+        $pattern = '/
         <layer\b[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*\/>   
         |
         <layer\b[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>      
@@ -1360,12 +1466,13 @@ private function updateLayerMetaInXml(string $sceneId, array $validated): void
         <\/layer>                                                                       
     /isx'; // x = free-spacing mode for readability
 
-    $updatedXml = preg_replace($pattern, '', $xml);
+        $updatedXml = preg_replace($pattern, '', $xml);
 
-    file_put_contents($tourXml, $updatedXml);
+        file_put_contents($tourXml, $updatedXml);
 
-    Log::info('🧹 All layers for scene removed (supports self-closing + block)', [
-        'sceneId' => $sceneId
-    ]);
-}
+        Log::info('🧹 All layers for scene removed (supports self-closing + block)', [
+            'sceneId'       => $sceneId,
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
 }
