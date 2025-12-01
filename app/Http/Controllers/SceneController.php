@@ -38,7 +38,7 @@ class SceneController extends Controller
     private function getTourXmlPath(string $municipalSlug): string
     {
         // S3 key: cebu/{municipalSlug}/tour.xml
-        return "cebu/{$municipalSlug}/tour.xml";
+        return "{$municipalSlug}/tour.xml";
     }
 
     private function loadTourXmlFromS3(string $municipalSlug): ?string
