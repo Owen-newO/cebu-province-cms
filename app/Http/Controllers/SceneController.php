@@ -589,7 +589,7 @@ class SceneController extends Controller
     // =====================================================================
     private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
 
         if (!file_exists($tourXml)) {
             Log::error('❌ tour.xml not found when appending scene', [
@@ -713,7 +713,7 @@ class SceneController extends Controller
     // =====================================================================
     private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug)
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) {
             Log::error('❌ tour.xml not found when appending layer', [
                 'path'          => $tourXml,
@@ -782,7 +782,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) {
             Log::error("❌ sidemap injection failed, tour.xml not found", [
                 'path'          => $tourXml,
@@ -841,7 +841,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -898,7 +898,7 @@ class SceneController extends Controller
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -945,7 +945,7 @@ class SceneController extends Controller
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -992,7 +992,7 @@ class SceneController extends Controller
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1039,7 +1039,7 @@ class SceneController extends Controller
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1089,7 +1089,7 @@ class SceneController extends Controller
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1139,7 +1139,7 @@ class SceneController extends Controller
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1186,7 +1186,7 @@ class SceneController extends Controller
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1233,7 +1233,7 @@ class SceneController extends Controller
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1280,7 +1280,7 @@ class SceneController extends Controller
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
 
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1325,7 +1325,7 @@ class SceneController extends Controller
     // =====================================================================
     private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1366,7 +1366,7 @@ class SceneController extends Controller
     // =====================================================================
     private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
 
         if (!file_exists($tourXml)) {
             Log::error('tour.xml not found', [
@@ -1433,7 +1433,7 @@ class SceneController extends Controller
     // =====================================================================
     private function removeSceneFromXml($sceneId, string $municipalSlug)
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
@@ -1453,7 +1453,7 @@ class SceneController extends Controller
     // =====================================================================
     private function removeLayerFromXml($sceneId, string $municipalSlug)
     {
-        $tourXml = public_path("{$municipalSlug}/tour.xml");
+        $tourXml = public_path("cebu/{$municipalSlug}/tour.xml");
         if (!file_exists($tourXml)) return;
 
         $xml = file_get_contents($tourXml);
