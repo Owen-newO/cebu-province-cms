@@ -458,7 +458,7 @@ const updateScene = () => {
             </label>
           <label
             style="background-color:#EEEDED;
-              width:100%;height:160px;border:2px dashed #d1d5db;
+              width:100%;height:150px;border:2px dashed #d1d5db;
               border-radius:12px;display:flex;align-items:center;
               justify-content:center;flex-direction:column;
               cursor:pointer;color:#666;overflow:hidden;
