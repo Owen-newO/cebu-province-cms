@@ -780,7 +780,7 @@ class SceneController extends Controller
     barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\">
     <layer type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
-        css=\"color:#FFFFFF; font-size:300%; font-family:Arial; padding-left:20px; text-align:bottom;\"/>
+        css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
 </layer>
 ";
 

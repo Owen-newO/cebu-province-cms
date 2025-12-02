@@ -364,15 +364,16 @@ const updateScene = () => {
               {{ mode==='create' ? 'Add New Scene Title' : 'Scene Title' }}
             </label>
             <input
-              v-model="scene.title"
-              placeholder="e.g., Magellan’s Cross"
-              :disabled="mode==='create' && isTitleDisabled"
-              :style="
-                mode==='create' && isTitleDisabled
-                  ? 'width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;background:#f3f4f6;cursor:not-allowed;font-size:15px;'
-                  : 'width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;background:#EEEDED;font-size:15px;'
-              "
-            />
+                v-model="scene.title"
+                placeholder="e.g., Magellan’s Cross"
+                :disabled="isUsingExisting"
+                :style="
+                  isUsingExisting
+                    ? 'width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;background:#f3f4f6;cursor:not-allowed;font-size:15px;'
+                    : 'width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;background:#EEEDED;font-size:15px;'
+                "
+              />
+
           </div>
 
           <!-- LOCATION -->
@@ -391,13 +392,16 @@ const updateScene = () => {
           <!-- BARANGAY -->
           <div>
             <label style="font-size:15px;font-weight:600;">Barangay</label>
-            <select
-              v-model="scene.barangay"
-              style="
-                width:100%;padding:12px;border-radius:10px;background:#EEEDED;
-                border:1px solid #d1d5db;font-size:15px;
-              "
-            >
+<select
+  v-model="scene.barangay"
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+>
+
               <option value="">Select Barangay</option>
               <option v-for="b in props.barangays" :key="b">{{ b }}</option>
             </select>
@@ -406,29 +410,38 @@ const updateScene = () => {
           <!-- CATEGORY -->
           <div>
             <label style="font-size:15px;font-weight:600;">Category</label>
-            <select
-              v-model="scene.category"
-              style="
-                width:100%;padding:12px;border-radius:10px;background:#EEEDED;
-                border:1px solid #d1d5db;font-size:15px;
-              "
-            >
+<select
+  v-model="scene.category"
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+>
+
+
               <option value="">Select Category</option>
               <option v-for="c in categories" :key="c">{{ c }}</option>
             </select>
+            
           </div>
 
           <!-- GOOGLE MAP -->
           <div>
             <label style="font-size:15px;font-weight:600;">Google Map Link (Optional)</label>
             <input
-              v-model="scene.google_map_link"
+  v-model="scene.google_map_link"
               placeholder="e.g., https://maps.app.goo.gl/..."
-              style="
-                width:100%;padding:12px;border-radius:10px;background:#EEEDED;
-                border:1px solid #d1d5db;font-size:15px;
-              "
-            />
+
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+/>
+
           </div>
 
         </div>
@@ -472,36 +485,57 @@ const updateScene = () => {
           <!-- ADDRESS -->
           <div>
             <label style="font-size:15px;font-weight:600;">Details & Description (Optional)</label>
-            <textarea rows="6"
-              v-model="scene.address"
+
+            <textarea
+  rows="6"
+  v-model="scene.address"
               placeholder="e.g. A scenic tourist spot known for its peaceful surroundings and beautiful views. Visitors can enjoy a short 50-meter trek to reach the main area and are required to pay an environmental fee of ₱50 upon entry. Open Monday to Sunday, 9:00 AM to 5:00 PM."
-              style="background-color:#EEEDED;
-                width:100%;padding:4px;border-radius:10px; line-height: 1.3; font-style: italic;
-                border:1px solid #d1d5db;font-size:12px;
-              "
-            />
+
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'background-color:#f3f4f6;width:100%;padding:4px;border-radius:10px;font-style:italic;border:1px solid #d1d5db;font-size:12px;cursor:not-allowed;'
+      : 'background-color:#EEEDED;width:100%;padding:4px;border-radius:10px;font-style:italic;border:1px solid #d1d5db;font-size:12px;'
+  "
+></textarea>
+
           </div>
 
           <!-- CONTACT + EMAIL -->
           <div style="display:flex;gap:12px;">
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Contact # (Optional)</label>
+
               <input
-                v-model="scene.contact_number"
+  v-model="scene.contact_number"
+  maxlength="11"
                 placeholder="e.g., 09123456789"
-                maxlength="11"
-                @input="scene.contact_number = scene.contact_number.replace(/[^0-9]/g, '')"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+  @input="scene.contact_number = scene.contact_number.replace(/[^0-9]/g, '')"
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+/>
+
             </div>
 
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Email (Optional)</label>
+
               <input
-                v-model="scene.email"
+  v-model="scene.email"
+  :disabled="isUsingExisting"
                 placeholder="e.g., cebu@mail.com"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+/>
+
             </div>
           </div>
 
@@ -510,19 +544,31 @@ const updateScene = () => {
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Website (Optional)</label>
               <input
-                v-model="scene.website"
+  v-model="scene.website"
+  :disabled="isUsingExisting"
                 placeholder="e.g., www.cebu.com"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+/>
+
             </div>
 
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Facebook (Optional)</label>
               <input
-                v-model="scene.facebook"
-                placeholder="e.g., facebook.com/cebu"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+            v-model="scene.facebook"
+            placeholder="e.g., facebook.com/cebu"
+            :disabled="isUsingExisting"
+            :style="
+              isUsingExisting
+                ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+                : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+            "
+          />
+
             </div>
           </div>
 
@@ -531,19 +577,30 @@ const updateScene = () => {
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Instagram (Optional)</label>
               <input
-                v-model="scene.instagram"
-                placeholder="e.g., instagram.com/cebu"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+                  v-model="scene.instagram"
+                  :disabled="isUsingExisting"
+                  placeholder="e.g., instagram.com/cebu"
+                  :style="
+                    isUsingExisting
+                      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+                      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+                  "
+                />
+
             </div>
 
             <div style="flex:1;">
               <label style="font-size:15px;font-weight:600;">Tiktok (Optional)</label>
               <input
-                v-model="scene.tiktok"
-                placeholder="e.g., tiktok.com/@cebu"
-                style="width:100%;padding:12px;border-radius:10px;border:1px solid #d1d5db;font-size:15px;background:#EEEDED;"
-              />
+              v-model="scene.tiktok"
+              placeholder="e.g., tiktok.com/@cebu"
+              :disabled="isUsingExisting"
+              :style="
+                isUsingExisting
+                  ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+                  : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+              "
+            />
             </div>
           </div>
 
