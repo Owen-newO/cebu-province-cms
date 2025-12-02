@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from "vue";
 import { router } from "@inertiajs/vue3";
+import { nextTick } from "vue";
 
 const emit = defineEmits(["close", "saveDraft", "publishScene"]);
 
@@ -142,36 +143,38 @@ const isTitleDisabled = ref(false);
 
 watch(
   () => scene.value.existingScene,
-  (val) => {
+  async (val) => {
     if (!val) {
-      // reset if cleared
       isTitleDisabled.value = false;
       scene.value = makeEmptyScene();
       return;
     }
 
-    isTitleDisabled.value = true;
-
     const data = existingScenesFull.value[val];
     if (!data) return;
 
-    // 👇 auto-fill all except location + panorama
-    scene.value.title = data.title;
-    scene.value.barangay = data.barangay;
-    scene.value.category = data.category;
-    scene.value.address = data.address;
-    scene.value.google_map_link = data.google_map_link;
-    scene.value.contact_number = data.contact_number;
-    scene.value.email = data.email;
-    scene.value.website = data.website;
-    scene.value.facebook = data.facebook;
-    scene.value.instagram = data.instagram;
-    scene.value.tiktok = data.tiktok;
+    // ⭐ Autofill first (UI updates)
+    scene.value.title = data.title || "";
+    scene.value.barangay = data.barangay || "";
+    scene.value.category = data.category || "";
+    scene.value.address = data.address || "";
+    scene.value.google_map_link = data.google_map_link || "";
+    scene.value.contact_number = data.contact_number || "";
+    scene.value.email = data.email || "";
+    scene.value.website = data.website || "";
+    scene.value.facebook = data.facebook || "";
+    scene.value.instagram = data.instagram || "";
+    scene.value.tiktok = data.tiktok || "";
 
-    // these MUST remain editable
     scene.value.location = "";
     scene.value.panorama = null;
     scene.value.previewUrl = null;
+
+    // ⭐ Wait for DOM update BEFORE disabling inputs
+    await nextTick();
+
+    // now lock everything
+    isTitleDisabled.value = true;
   }
 );
 
