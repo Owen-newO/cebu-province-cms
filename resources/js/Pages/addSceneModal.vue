@@ -490,7 +490,7 @@ const updateScene = () => {
             <label style="font-size:15px;font-weight:600;">Details & Description (Optional)</label>
 
             <textarea
-  rows="6"
+  rows="4"
   v-model="scene.address"
               placeholder="e.g. A scenic tourist spot known for its peaceful surroundings and beautiful views. Visitors can enjoy a short 50-meter trek to reach the main area and are required to pay an environmental fee of ₱50 upon entry. Open Monday to Sunday, 9:00 AM to 5:00 PM."
 
