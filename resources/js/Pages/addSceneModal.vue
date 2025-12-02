@@ -450,7 +450,7 @@ const updateScene = () => {
         </div>
 
         <!-- RIGHT COLUMN -->
-        <div style="display:flex;flex-direction:column;gap:15px;">
+        <div style="display:flex;flex-direction:column;gap:18px;">
 
           <!-- UPLOAD BOX -->
            <label style="margin-top:-22px;font-size:15px;font-weight:600;color:#111;">
