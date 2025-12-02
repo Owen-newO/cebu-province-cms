@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted, watch, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 
 const emit = defineEmits(["close", "saveDraft", "publishScene"]);
@@ -13,12 +13,17 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 
 const showModal = ref(false);
 const existingScenes = ref([]);
+const existingScenesFull = ref({}); // 👈 ADDED — store full existing scenes
 
-// 👇 mode + editing id
-const mode = ref("create"); // "create" | "edit"
+// -----------------------------------------------------------
+// mode + editing
+// -----------------------------------------------------------
+const mode = ref("create");
 const editingId = ref(null);
 
-// default scene state factory
+// -----------------------------------------------------------
+// default scene
+// -----------------------------------------------------------
 const makeEmptyScene = () => ({
   existingScene: "",
   title: "",
@@ -38,11 +43,10 @@ const makeEmptyScene = () => ({
 });
 
 const scene = ref(makeEmptyScene());
-const selectedBarangay = ref("");
 
-// --------------------------------------------------
-// Load existing scenes (for "Add to existing")
-// --------------------------------------------------
+// -----------------------------------------------------------
+// Load existing scenes
+// -----------------------------------------------------------
 onMounted(async () => {
   try {
     const res = await fetch("/api/scenes");
@@ -53,17 +57,24 @@ onMounted(async () => {
         s.municipal?.toLowerCase().trim() ===
         props.municipal?.toLowerCase().trim()
     );
-    const uniqueTitles = [...new Set(filtered.map((s) => s.title))];
-    existingScenes.value = uniqueTitles;
+
+    const titles = [...new Set(filtered.map((s) => s.title))];
+
+    existingScenes.value = titles;
+
+    // 👇 store full data for auto-fill
+    filtered.forEach((s) => {
+      existingScenesFull.value[s.title] = s;
+    });
+
   } catch (error) {
     console.error("❌ Failed to load existing scenes:", error);
   }
-  console.log("🏙 municipal prop ->", props.municipal);
 });
 
-// --------------------------------------------------
-// Modal open/close helpers
-// --------------------------------------------------
+// -----------------------------------------------------------
+// Modal helpers
+// -----------------------------------------------------------
 const openModal = () => {
   mode.value = "create";
   editingId.value = null;
@@ -92,7 +103,6 @@ const openForEdit = (initialScene) => {
     instagram: initialScene.instagram || "",
     tiktok: initialScene.tiktok || "",
     panorama: null,
-    // try to use existing preview path if available
     previewUrl:
       initialScene.img ||
       initialScene.panorama_path ||
@@ -107,15 +117,11 @@ const closeModal = () => {
   emit("close");
 };
 
-// expose to parent
-defineExpose({
-  openModal,    // still usable if you ever want it
-  openForEdit,  // used by card "Edit" button
-});
+defineExpose({ openModal, openForEdit });
 
-// --------------------------------------------------
-// File upload
-// --------------------------------------------------
+// -----------------------------------------------------------
+// File Upload
+// -----------------------------------------------------------
 const handleFileUpload = (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -124,29 +130,62 @@ const handleFileUpload = (e) => {
   }
 };
 
-// --------------------------------------------------
-// Disable title input when using existingScene (create mode)
-// --------------------------------------------------
+// -----------------------------------------------------------
+// Disable ALL DATA fields when selecting an existing scene
+// -----------------------------------------------------------
+const isUsingExisting = computed(() => {
+  return mode.value === "create" && scene.value.existingScene;
+});
+
+// Title disable only
 const isTitleDisabled = ref(false);
+
 watch(
   () => scene.value.existingScene,
   (val) => {
-    if (!val) return;
+    if (!val) {
+      // reset if cleared
+      isTitleDisabled.value = false;
+      scene.value = makeEmptyScene();
+      return;
+    }
 
     isTitleDisabled.value = true;
 
-    const reset = makeEmptyScene();
-    reset.existingScene = val; // keep selected value
-    scene.value = reset;
+    const data = existingScenesFull.value[val];
+    if (!data) return;
+
+    // 👇 auto-fill all except location + panorama
+    scene.value.title = data.title;
+    scene.value.barangay = data.barangay;
+    scene.value.category = data.category;
+    scene.value.address = data.address;
+    scene.value.google_map_link = data.google_map_link;
+    scene.value.contact_number = data.contact_number;
+    scene.value.email = data.email;
+    scene.value.website = data.website;
+    scene.value.facebook = data.facebook;
+    scene.value.instagram = data.instagram;
+    scene.value.tiktok = data.tiktok;
+
+    // these MUST remain editable
+    scene.value.location = "";
+    scene.value.panorama = null;
+    scene.value.previewUrl = null;
   }
 );
 
-// --------------------------------------------------
-// CREATE FLOW – send to scenes.store
-// --------------------------------------------------
+// -----------------------------------------------------------
+// Submit create
+// -----------------------------------------------------------
 const submitScene = (isPublished) => {
   const formData = new FormData();
-  formData.append("title", scene.value.title || scene.value.existingScene);
+
+  formData.append(
+    "title",
+    scene.value.title || scene.value.existingScene
+  );
+
   formData.append("municipal", props.municipal);
   formData.append("location", scene.value.location);
   formData.append("barangay", scene.value.barangay);
@@ -160,18 +199,15 @@ const submitScene = (isPublished) => {
   formData.append("instagram", scene.value.instagram);
   formData.append("tiktok", scene.value.tiktok);
   formData.append("is_published", isPublished ? "true" : "false");
-  if (scene.value.panorama) formData.append("panorama", scene.value.panorama);
+
+  if (scene.value.panorama)
+    formData.append("panorama", scene.value.panorama);
 
   router.post(route("scenes.store"), formData, {
     preserveScroll: true,
-    onStart: () => console.log("⏳ Uploading scene..."),
     onSuccess: () => {
-      console.log("✅ Scene saved successfully!");
       closeModal();
       window.location.reload();
-    },
-    onError: (errors) => {
-      console.error("❌ Validation errors:", errors);
     },
   });
 };
@@ -179,23 +215,21 @@ const submitScene = (isPublished) => {
 const saveDraft = () => submitScene(false);
 const publishScene = () => submitScene(true);
 
-// --------------------------------------------------
-// EDIT FLOW – send to scenes.update (no retiling if no file)
-// --------------------------------------------------
+// -----------------------------------------------------------
+// Update Scene
+// -----------------------------------------------------------
 const updateScene = () => {
   if (!editingId.value) return;
 
   const formData = new FormData();
+  formData.append("_method", "PUT");
 
-  // you can keep this, but it's not strictly required once the route accepts PUT
-  formData.append('_method', 'PUT');
-
-  formData.append('title', scene.value.title);
-  formData.append('municipal', props.municipal);
-  formData.append('location', scene.value.location);
-  formData.append('barangay', scene.value.barangay);
-  formData.append('category', scene.value.category);
-  formData.append('address', scene.value.address);
+  formData.append("title", scene.value.title);
+  formData.append("municipal", props.municipal);
+  formData.append("location", scene.value.location);
+  formData.append("barangay", scene.value.barangay);
+  formData.append("category", scene.value.category);
+  formData.append("address", scene.value.address);
   formData.append("google_map_link", scene.value.google_map_link);
   formData.append("contact_number", scene.value.contact_number);
   formData.append("email", scene.value.email);
@@ -203,20 +237,15 @@ const updateScene = () => {
   formData.append("facebook", scene.value.facebook);
   formData.append("instagram", scene.value.instagram);
   formData.append("tiktok", scene.value.tiktok);
-  formData.append('is_published', 'true');
+  formData.append("is_published", "true");
 
-  router.visit(route('scenes.update', editingId.value), {
-    method: 'post',          // Inertia sends POST, Laravel can also accept PUT now
+  router.visit(route("scenes.update", editingId.value), {
+    method: "post",
     data: formData,
     preserveScroll: true,
-    onStart: () => console.log('⏳ Updating scene...'),
     onSuccess: () => {
-      console.log('✅ Scene updated!');
       closeModal();
       window.location.reload();
-    },
-    onError: (errors) => {
-      console.error('❌ Update validation errors:', errors);
     },
   });
 };
@@ -409,7 +438,7 @@ const updateScene = () => {
 
           <!-- UPLOAD BOX -->
            <label style="margin-top:-22px;font-size:15px;font-weight:600;color:#111;">
-              Add to Existing Scene (Optional)
+              Add to Existing Scene 
             </label>
           <label
             style="background-color:#EEEDED;
@@ -442,7 +471,7 @@ const updateScene = () => {
 
           <!-- ADDRESS -->
           <div>
-            <label style="font-size:15px;font-weight:600;">Details & Description</label>
+            <label style="font-size:15px;font-weight:600;">Details & Description (Optional)</label>
             <textarea rows="6"
               v-model="scene.address"
               placeholder="e.g. A scenic tourist spot known for its peaceful surroundings and beautiful views. Visitors can enjoy a short 50-meter trek to reach the main area and are required to pay an environmental fee of ₱50 upon entry. Open Monday to Sunday, 9:00 AM to 5:00 PM."
@@ -456,7 +485,7 @@ const updateScene = () => {
           <!-- CONTACT + EMAIL -->
           <div style="display:flex;gap:12px;">
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Contact #</label>
+              <label style="font-size:15px;font-weight:600;">Contact # (Optional)</label>
               <input
                 v-model="scene.contact_number"
                 placeholder="e.g., 09123456789"
@@ -467,7 +496,7 @@ const updateScene = () => {
             </div>
 
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Email</label>
+              <label style="font-size:15px;font-weight:600;">Email (Optional)</label>
               <input
                 v-model="scene.email"
                 placeholder="e.g., cebu@mail.com"
@@ -479,7 +508,7 @@ const updateScene = () => {
           <!-- WEBSITE + FACEBOOK -->
           <div style="display:flex;gap:12px;">
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Website</label>
+              <label style="font-size:15px;font-weight:600;">Website (Optional)</label>
               <input
                 v-model="scene.website"
                 placeholder="e.g., www.cebu.com"
@@ -488,7 +517,7 @@ const updateScene = () => {
             </div>
 
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Facebook</label>
+              <label style="font-size:15px;font-weight:600;">Facebook (Optional)</label>
               <input
                 v-model="scene.facebook"
                 placeholder="e.g., facebook.com/cebu"
@@ -500,7 +529,7 @@ const updateScene = () => {
           <!-- INSTAGRAM + TIKTOK -->
           <div style="display:flex;gap:12px;">
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Instagram</label>
+              <label style="font-size:15px;font-weight:600;">Instagram (Optional)</label>
               <input
                 v-model="scene.instagram"
                 placeholder="e.g., instagram.com/cebu"
@@ -509,7 +538,7 @@ const updateScene = () => {
             </div>
 
             <div style="flex:1;">
-              <label style="font-size:15px;font-weight:600;">Tiktok</label>
+              <label style="font-size:15px;font-weight:600;">Tiktok (Optional)</label>
               <input
                 v-model="scene.tiktok"
                 placeholder="e.g., tiktok.com/@cebu"
