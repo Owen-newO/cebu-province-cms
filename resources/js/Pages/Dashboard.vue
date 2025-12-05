@@ -24,21 +24,15 @@ const sceneModal = ref(null);
 const getThumbnail = (panoPath) => {
   if (!panoPath) return "";
 
-  // CASE 1: panorama_path is already a tiles file:
-  // e.g. "cebu/samboan/1764.../panos/1764....tiles/l1_c0_r0.jpg"
-  if (panoPath.includes(".tiles/")) {
-    const parts = panoPath.split("/");
-    parts.pop(); // remove last file (like l1_c0_r0.jpg)
-    return parts.join("/") + "/thumb.jpg";
-  }
-
-  // CASE 2: panorama_path is just the scene folder:
-  // e.g. "cebu/samboan/1764666111_Day_2_5"
   const parts = panoPath.split("/");
-  const folder = parts[parts.length - 1]; // "1764666111_Day_2_5"
 
-  // Build: cebu/samboan/1764666111_Day_2_5/panos/1764666111_Day_2_5.tiles/thumb.jpg
-  return `${panoPath}/panos/${folder}.tiles/thumb.jpg`;
+  const file = parts.pop();
+
+  const sceneName = file.replace(/\.[^/.]+$/, ""); 
+
+  const base = parts.join("/");
+
+  return `${base}/panos/${sceneName}.tiles/thumb.jpg`;
 };
 
 // ✅ Helper to normalize image URLs (S3 or local)
