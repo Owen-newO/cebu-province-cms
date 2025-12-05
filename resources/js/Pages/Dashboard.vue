@@ -20,7 +20,17 @@ const activeGroupCount = ref(0);
 const showModal = ref(true);
 
 const sceneModal = ref(null);
+const getThumbnail = (panoPath) => {
+  if (!panoPath) return "";
 
+  // Example: cebu/samboan/123/panos/123.tiles/l1_c0_r0.jpg
+  // Step 1: remove the last segment → cebu/samboan/123/panos/123.tiles
+  const parts = panoPath.split("/");
+  parts.pop(); // remove file (l1_c0_r0.jpg)
+
+  // Step 2: add thumbnail file
+  return parts.join("/") + "/thumb.jpg";
+};
 // ✅ Helper to normalize image URLs (S3 or local)
 const getImageUrl = (path) => {
   if (!path) return "/images/sample1.jpg";
@@ -34,14 +44,6 @@ const getImageUrl = (path) => {
 
 const logout = () => {
   router.post(route("logout"));
-};
-const getThumbnailUrl = (panoPath) => {
-  if (!panoPath) return "";
-
-  // Extract folder root: cebu/samboan/123/
-  const parts = panoPath.split("/");
-  const base = parts.slice(0, parts.length - 2).join("/");  
-  return `${base}/thumb.jpg`;
 };
 
 const deleteScene = async (id) => {
@@ -321,9 +323,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <img
-                :src="getImageUrl(getThumbnailUrl(scene.panorama_path))"
+                :src="getImageUrl(getThumbnail(scene.panorama_path))"
                 loading="lazy"
-                alt=""
                 style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
               />
               <div
@@ -467,8 +468,9 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             style="background:white; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px;"
           >
             <img
-              :src="getImageUrl(scene.img)"
-              style="width:100%; height:200px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
+              :src="getImageUrl(getThumbnail(scene.panorama_path))"
+              loading="lazy"
+              style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
             />
             <h2 style="font-size:18px; font-weight:600;">{{ scene.title }}</h2>
             <span
