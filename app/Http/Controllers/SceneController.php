@@ -92,7 +92,7 @@ class SceneController extends Controller
     public function store(Request $request)
     {
 
-        dd($request->all(), $request->file('panorama'));
+        dd("VALIDATION FAILS?", $request->all());
 
         $validated = $this->validateScene($request);
         $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
