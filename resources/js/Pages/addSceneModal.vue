@@ -349,7 +349,9 @@ const updateScene = () => {
               "
             >
               <option value="">Select Scene</option>
-              <option v-for="(s,i) in existingScenes" :key="i">{{ s }}</option>
+              <option v-for="(s,i) in existingScenes" :key="i" :value="s">
+                {{ s }}
+              </option>
             </select>
           </div>
 
