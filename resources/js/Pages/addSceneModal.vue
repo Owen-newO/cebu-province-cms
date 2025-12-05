@@ -345,6 +345,7 @@ const updateScene = () => {
                 font-size:15px;
               "
             >
+              <option v="">New scene</option>
               <option v-for="(s,i) in existingScenes" :key="i" :value="s">
                 {{ s }}
               </option>
