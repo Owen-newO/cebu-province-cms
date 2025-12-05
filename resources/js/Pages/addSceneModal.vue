@@ -153,17 +153,17 @@ watch(
   () => scene.value.existingScene,
   async (val) => {
     // 🟢 CASE 1: "Select Scene" / empty  → behave like brand-new scene
-          if (!val || val === "Select Scene") {
-        const fresh = makeEmptyScene();
+    if (!val || val === "Select Scene") {
+  const fresh = makeEmptyScene();
 
-        // mutate instead of replace
-        Object.keys(fresh).forEach((key) => {
-          scene.value[key] = fresh[key];
-        });
+  // mutate instead of replace
+  Object.keys(fresh).forEach((key) => {
+    scene.value[key] = fresh[key];
+  });
 
-        scene.value.existingScene = "";
-        return;
-      }
+  scene.value.existingScene = "";
+  return;
+}
 
     // 🟡 CASE 2: picked an existing scene → autofill from DB
     const data = existingScenesFull.value[val];
@@ -367,7 +367,7 @@ const updateScene = () => {
               "
             >
               <option value="">Select Scene</option>
-              <option v-for="(s,i) in existingScenes" :key="i">{{ s }}</option>
+              <option v-for="(s,i) in existingScenes" :key="i" :value="s">{{ s }}</option>
             </select>
           </div>
 
