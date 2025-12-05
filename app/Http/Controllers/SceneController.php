@@ -92,8 +92,6 @@ class SceneController extends Controller
     public function store(Request $request)
     {
 
-        dd("VALIDATION FAILS?", $request->all());
-
         $validated = $this->validateScene($request);
         $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
         $validated['contact_number']  = $request->contact_number;
