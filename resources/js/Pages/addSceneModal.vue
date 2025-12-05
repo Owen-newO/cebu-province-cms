@@ -145,8 +145,7 @@ watch(
   () => scene.value.existingScene,
   (val) => {
     if (!val) {
-      // Reset to new scene (everything editable)
-      scene.value = makeEmptyScene();
+      // Just stop locking fields — DO NOT reset form
       return;
     }
 
@@ -166,7 +165,7 @@ watch(
     scene.value.instagram = data.instagram || "";
     scene.value.tiktok = data.tiktok || "";
 
-    // Keep these editable
+    // Keep editable
     scene.value.location = "";
     scene.value.panorama = null;
     scene.value.previewUrl = null;
