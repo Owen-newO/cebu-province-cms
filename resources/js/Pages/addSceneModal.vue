@@ -135,9 +135,8 @@ const handleFileUpload = (e) => {
 // Disable ALL DATA fields when selecting an existing scene
 // -----------------------------------------------------------
 const isUsingExisting = computed(() => {
-  return mode.value === "create" && 
-         scene.value.existingScene !== "__new__" &&
-         scene.value.existingScene !== "";
+  return mode.value === "create" &&
+         existingScenes.value.includes(scene.value.existingScene);
 });
 
 // Title disable only
