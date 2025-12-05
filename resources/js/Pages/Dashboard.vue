@@ -24,14 +24,21 @@ const sceneModal = ref(null);
 const getThumbnail = (panoPath) => {
   if (!panoPath) return "";
 
-  // Split by folder
+  // CASE 1: panorama_path is already a tiles file:
+  // e.g. "cebu/samboan/1764.../panos/1764....tiles/l1_c0_r0.jpg"
+  if (panoPath.includes(".tiles/")) {
+    const parts = panoPath.split("/");
+    parts.pop(); // remove last file (like l1_c0_r0.jpg)
+    return parts.join("/") + "/thumb.jpg";
+  }
+
+  // CASE 2: panorama_path is just the scene folder:
+  // e.g. "cebu/samboan/1764666111_Day_2_5"
   const parts = panoPath.split("/");
+  const folder = parts[parts.length - 1]; // "1764666111_Day_2_5"
 
-  // Remove ONLY the last segment (tile image)
-  parts.pop(); 
-  // Now path = cebu/samboan/123/panos/123.tiles
-
-  return parts.join("/") + "/thumb.jpg";
+  // Build: cebu/samboan/1764666111_Day_2_5/panos/1764666111_Day_2_5.tiles/thumb.jpg
+  return `${panoPath}/panos/${folder}.tiles/thumb.jpg`;
 };
 
 // ✅ Helper to normalize image URLs (S3 or local)
@@ -326,9 +333,10 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <img
-                :src="getImageUrl(getThumbnail(scene.panorama_path))"
+                :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
                 loading="lazy"
-                style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
+                alt=""
+                style="width: 100%; height: 180px; border-radius: 12px; object-fit: cover; margin-bottom: 12px;"
               />
               <div
                 v-if="scene.count > 1"
@@ -471,10 +479,11 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             style="background:white; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px;"
           >
             <img
-              :src="getImageUrl(getThumbnail(scene.panorama_path))"
-              loading="lazy"
-              style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
-            />
+                :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
+                loading="lazy"
+                alt=""
+                style="width: 100%; height: 180px; border-radius: 12px; object-fit: cover; margin-bottom: 12px;"
+              />
             <h2 style="font-size:18px; font-weight:600;">{{ scene.title }}</h2>
             <span
               style="background:#f9fafb; border-radius:20px; font-size:12px; padding:4px 12px; color:#111827; border:1px solid #e5e7eb;"
