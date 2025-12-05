@@ -35,6 +35,14 @@ const getImageUrl = (path) => {
 const logout = () => {
   router.post(route("logout"));
 };
+const getThumbnailUrl = (panoPath) => {
+  if (!panoPath) return "";
+
+  // Extract folder root: cebu/samboan/123/
+  const parts = panoPath.split("/");
+  const base = parts.slice(0, parts.length - 2).join("/");  
+  return `${base}/thumb.jpg`;
+};
 
 const deleteScene = async (id) => {
   if (confirm("Are you sure you want to delete this scene?")) {
@@ -313,7 +321,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <img
-                :src="getImageUrl(scene.panorama_path || scene.img)"
+                :src="getImageUrl(getThumbnailUrl(scene.panorama_path))"
+                loading="lazy"
                 alt=""
                 style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
               />
