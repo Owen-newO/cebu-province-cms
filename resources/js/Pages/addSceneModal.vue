@@ -143,34 +143,30 @@ const isUsingExisting = computed(() => {
 const isTitleDisabled = ref(false);
 
 watch(() => scene.value.existingScene, (val) => {
-  if (val === "__new__") {
-    scene.value = makeEmptyScene();
-    return;
-  }
+  // NEW SCENE → DO NOTHING, DO NOT RESET
+  if (val === "__new__" || val === "") return;
 
-  // existing scene selected
   const data = existingScenesFull.value[val];
   if (!data) return;
 
-    // Autofill the locked fields
-    scene.value.title = data.title || "";
-    scene.value.barangay = data.barangay || "";
-    scene.value.category = data.category || "";
-    scene.value.address = data.address || "";
-    scene.value.google_map_link = data.google_map_link || "";
-    scene.value.contact_number = data.contact_number || "";
-    scene.value.email = data.email || "";
-    scene.value.website = data.website || "";
-    scene.value.facebook = data.facebook || "";
-    scene.value.instagram = data.instagram || "";
-    scene.value.tiktok = data.tiktok || "";
+  // Autofill locked fields
+  scene.value.title = data.title || "";
+  scene.value.barangay = data.barangay || "";
+  scene.value.category = data.category || "";
+  scene.value.address = data.address || "";
+  scene.value.google_map_link = data.google_map_link || "";
+  scene.value.contact_number = data.contact_number || "";
+  scene.value.email = data.email || "";
+  scene.value.website = data.website || "";
+  scene.value.facebook = data.facebook || "";
+  scene.value.instagram = data.instagram || "";
+  scene.value.tiktok = data.tiktok || "";
 
-    // Keep editable
-    scene.value.location = "";
-    scene.value.panorama = null;
-    scene.value.previewUrl = null;
-  }
-);
+  // Editable fields reset
+  scene.value.location = "";
+  scene.value.panorama = null;
+  scene.value.previewUrl = null;
+});
 
 // -----------------------------------------------------------
 // Submit create
