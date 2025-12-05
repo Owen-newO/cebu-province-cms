@@ -135,50 +135,53 @@ const handleFileUpload = (e) => {
 // Disable ALL DATA fields when selecting an existing scene
 // -----------------------------------------------------------
 const isUsingExisting = computed(() => {
-  return mode.value === "create" && scene.value.existingScene;
+  const v = scene.value.existingScene;
+  return (
+    mode.value === "create" &&
+    v !== "" &&                // not the empty placeholder
+    v !== "Select Scene" &&    // (in case you set value="Select Scene")
+    !!v
+  );
 });
+
+
 
 // Title disable only
 const isTitleDisabled = ref(false);
 
-watch(() => scene.value.existingScene, async (val) => {
-  if (!val) {
-    // CLEAR DISABLED STATES
-    isTitleDisabled.value = false;
+watch(
+  () => scene.value.existingScene,
+  async (val) => {
+    // 🟢 CASE 1: "Select Scene" / empty  → behave like brand-new scene
+    if (!val || val === "Select Scene") {
+      const fresh = makeEmptyScene();
+      // preserve municipal silently if you want, but reset all fields:
+      scene.value = { ...fresh, existingScene: "" };
+      return;
+    }
 
-    // RESET SCENE
-    scene.value = makeEmptyScene();
+    // 🟡 CASE 2: picked an existing scene → autofill from DB
+    const data = existingScenesFull.value[val];
+    if (!data) return;
 
-    // ENSURE THE SELECT REALLY CLEARS
-    await nextTick();
-    scene.value.existingScene = "";
+    scene.value.title = data.title || "";
+    scene.value.barangay = data.barangay || "";
+    scene.value.category = data.category || "";
+    scene.value.address = data.address || "";
+    scene.value.google_map_link = data.google_map_link || "";
+    scene.value.contact_number = data.contact_number || "";
+    scene.value.email = data.email || "";
+    scene.value.website = data.website || "";
+    scene.value.facebook = data.facebook || "";
+    scene.value.instagram = data.instagram || "";
+    scene.value.tiktok = data.tiktok || "";
 
-    return;
+    // only these stay custom per pano
+    scene.value.location = "";
+    scene.value.panorama = null;
+    scene.value.previewUrl = null;
   }
-
-  // If val exists → autofill
-  const data = existingScenesFull.value[val];
-  if (!data) return;
-
-  scene.value.title = data.title || "";
-  scene.value.barangay = data.barangay || "";
-  scene.value.category = data.category || "";
-  scene.value.address = data.address || "";
-  scene.value.google_map_link = data.google_map_link || "";
-  scene.value.contact_number = data.contact_number || "";
-  scene.value.email = data.email || "";
-  scene.value.website = data.website || "";
-  scene.value.facebook = data.facebook || "";
-  scene.value.instagram = data.instagram || "";
-  scene.value.tiktok = data.tiktok || "";
-
-  scene.value.location = "";
-  scene.value.panorama = null;
-  scene.value.previewUrl = null;
-
-  await nextTick();
-  isTitleDisabled.value = true;
-});
+);
 
 // -----------------------------------------------------------
 // Submit create
