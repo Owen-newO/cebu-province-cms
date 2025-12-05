@@ -20,17 +20,20 @@ const activeGroupCount = ref(0);
 const showModal = ref(true);
 
 const sceneModal = ref(null);
+
 const getThumbnail = (panoPath) => {
   if (!panoPath) return "";
 
-  // Example: cebu/samboan/123/panos/123.tiles/l1_c0_r0.jpg
-  // Step 1: remove the last segment → cebu/samboan/123/panos/123.tiles
+  // Split by folder
   const parts = panoPath.split("/");
-  parts.pop(); // remove file (l1_c0_r0.jpg)
 
-  // Step 2: add thumbnail file
+  // Remove ONLY the last segment (tile image)
+  parts.pop(); 
+  // Now path = cebu/samboan/123/panos/123.tiles
+
   return parts.join("/") + "/thumb.jpg";
 };
+
 // ✅ Helper to normalize image URLs (S3 or local)
 const getImageUrl = (path) => {
   if (!path) return "/images/sample1.jpg";
