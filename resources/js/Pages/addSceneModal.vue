@@ -135,7 +135,9 @@ const handleFileUpload = (e) => {
 // Disable ALL DATA fields when selecting an existing scene
 // -----------------------------------------------------------
 const isUsingExisting = computed(() => {
-  return mode.value === "create" && scene.value.existingScene !== "";
+  return mode.value === "create" && 
+         scene.value.existingScene !== "__new__" &&
+         scene.value.existingScene !== "";
 });
 
 // Title disable only
@@ -143,15 +145,13 @@ const isTitleDisabled = ref(false);
 
 watch(() => scene.value.existingScene, (val) => {
   if (val === "__new__") {
-    // NEW SCENE MODE
     scene.value = makeEmptyScene();
     return;
   }
 
-  if (!val) return;
-
-    const data = existingScenesFull.value[val];
-    if (!data) return;
+  // existing scene selected
+  const data = existingScenesFull.value[val];
+  if (!data) return;
 
     // Autofill the locked fields
     scene.value.title = data.title || "";
