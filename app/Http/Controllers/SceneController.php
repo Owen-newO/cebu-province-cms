@@ -419,14 +419,8 @@ class SceneController extends Controller
         'location'        => 'nullable|string|max:255',
         'barangay'        => 'nullable|string|max:255',
         'category'        => 'nullable|string|max:255',
-
-        // allow long descriptions
-        'address'         => 'nullable|string',
-
-        // allow iframe src or long embed codes
+        'address'         => 'nullable|string|max:5000',
         'google_map_link' => 'nullable|string',
-
-        // allow long social URLs
         'contact_number'  => 'nullable|string|max:255',
         'email'           => 'nullable|string|max:255',
         'website'         => 'nullable|string',

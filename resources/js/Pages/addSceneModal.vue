@@ -335,6 +335,7 @@ const updateScene = () => {
             </label>
             <select
               v-model="scene.existingScene"
+              placeholder="Select Existing Scene"
               style="
                 width:100%;
                 padding:12px;
@@ -344,7 +345,6 @@ const updateScene = () => {
                 font-size:15px;
               "
             >
-              <option value="__new__">Add New Scene</option>
               <option v-for="(s,i) in existingScenes" :key="i" :value="s">
                 {{ s }}
               </option>
