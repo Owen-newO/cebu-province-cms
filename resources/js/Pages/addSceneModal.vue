@@ -153,12 +153,17 @@ watch(
   () => scene.value.existingScene,
   async (val) => {
     // 🟢 CASE 1: "Select Scene" / empty  → behave like brand-new scene
-    if (!val || val === "Select Scene") {
-      const fresh = makeEmptyScene();
-      // preserve municipal silently if you want, but reset all fields:
-      scene.value = { ...fresh, existingScene: "" };
-      return;
-    }
+          if (!val || val === "Select Scene") {
+        const fresh = makeEmptyScene();
+
+        // mutate instead of replace
+        Object.keys(fresh).forEach((key) => {
+          scene.value[key] = fresh[key];
+        });
+
+        scene.value.existingScene = "";
+        return;
+      }
 
     // 🟡 CASE 2: picked an existing scene → autofill from DB
     const data = existingScenesFull.value[val];
