@@ -135,7 +135,7 @@ const handleFileUpload = (e) => {
 // Disable ALL DATA fields when selecting an existing scene
 // -----------------------------------------------------------
 const isUsingExisting = computed(() => {
-  return mode.value === "create" && scene.value.existingScene;
+  return mode.value === "create" && scene.value.existingScene !== "";
 });
 
 // Title disable only
@@ -143,9 +143,9 @@ const isTitleDisabled = ref(false);
 
 watch(
   () => scene.value.existingScene,
-  async (val) => {
+  (val) => {
     if (!val) {
-      isTitleDisabled.value = false;
+      // Reset to new scene (everything editable)
       scene.value = makeEmptyScene();
       return;
     }
@@ -153,7 +153,7 @@ watch(
     const data = existingScenesFull.value[val];
     if (!data) return;
 
-    // ⭐ Autofill first (UI updates)
+    // Autofill the locked fields
     scene.value.title = data.title || "";
     scene.value.barangay = data.barangay || "";
     scene.value.category = data.category || "";
@@ -166,15 +166,10 @@ watch(
     scene.value.instagram = data.instagram || "";
     scene.value.tiktok = data.tiktok || "";
 
+    // Keep these editable
     scene.value.location = "";
     scene.value.panorama = null;
     scene.value.previewUrl = null;
-
-    // ⭐ Wait for DOM update BEFORE disabling inputs
-    await nextTick();
-
-    // now lock everything
-    isTitleDisabled.value = true;
   }
 );
 
