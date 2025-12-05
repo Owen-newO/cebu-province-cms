@@ -141,13 +141,14 @@ const isUsingExisting = computed(() => {
 // Title disable only
 const isTitleDisabled = ref(false);
 
-watch(
-  () => scene.value.existingScene,
-  (val) => {
-    if (!val) {
-      // Just stop locking fields — DO NOT reset form
-      return;
-    }
+watch(() => scene.value.existingScene, (val) => {
+  if (val === "__new__") {
+    // NEW SCENE MODE
+    scene.value = makeEmptyScene();
+    return;
+  }
+
+  if (!val) return;
 
     const data = existingScenesFull.value[val];
     if (!data) return;
@@ -348,7 +349,7 @@ const updateScene = () => {
                 font-size:15px;
               "
             >
-              <option value="">Select Scene</option>
+              <option value="__new__">Add New Scene</option>
               <option v-for="(s,i) in existingScenes" :key="i" :value="s">
                 {{ s }}
               </option>
