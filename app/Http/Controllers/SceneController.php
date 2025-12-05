@@ -414,29 +414,37 @@ class SceneController extends Controller
     // VALIDATION
     // =====================================================================
     private function validateScene($request, $updating = false)
-    {
-        return $request->validate([
-            'title'           => 'required|string|max:255',
-            'municipal'       => 'required|string|max:255',
-            'location'        => 'nullable|string|max:255',
-            'barangay'        => 'nullable|string|max:255',
-            'category'        => 'nullable|string|max:255',
-            'address'         => 'nullable|string|max:255',
-            'google_map_link' => 'nullable|string',
-            'contact_number'  => 'nullable|string',
-            'email'           => 'nullable|string|max:255',
-            'website'         => 'nullable|string|max:255',
-            'facebook'        => 'nullable|string|max:255',
-            'instagram'       => 'nullable|string|max:255',
-            'tiktok'          => 'nullable|string|max:255',
-            'is_published'    => 'required',
-            'panorama'        =>
-                $updating
-                    ? 'nullable|file|mimes:jpg,jpeg'
-                    : 'required|file|mimes:jpg,jpeg',
-        ]);
-    }
+{
+    return $request->validate([
+        'title'           => 'required|string|max:255',
+        'municipal'       => 'required|string|max:255',
+        'location'        => 'nullable|string|max:255',
+        'barangay'        => 'nullable|string|max:255',
+        'category'        => 'nullable|string|max:255',
 
+        // allow long descriptions
+        'address'         => 'nullable|string',
+
+        // allow iframe src or long embed codes
+        'google_map_link' => 'nullable|string',
+
+        // allow long social URLs
+        'contact_number'  => 'nullable|string|max:255',
+        'email'           => 'nullable|string|max:255',
+        'website'         => 'nullable|string',
+        'facebook'        => 'nullable|string',
+        'instagram'       => 'nullable|string',
+        'tiktok'          => 'nullable|string',
+
+        'is_published'    => 'required',
+
+        // panorama file rules
+        'panorama'        =>
+            $updating
+                ? 'nullable|file|mimes:jpg,jpeg'
+                : 'required|file|mimes:jpg,jpeg',
+    ]);
+}
     // =====================================================================
     // KRPANO EXECUTION
     // =====================================================================
