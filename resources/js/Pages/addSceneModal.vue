@@ -135,16 +135,8 @@ const handleFileUpload = (e) => {
 // Disable ALL DATA fields when selecting an existing scene
 // -----------------------------------------------------------
 const isUsingExisting = computed(() => {
-  const v = scene.value.existingScene;
-  return (
-    mode.value === "create" &&
-    v !== "" &&                // not the empty placeholder
-    v !== "Select Scene" &&    // (in case you set value="Select Scene")
-    !!v
-  );
+  return mode.value === "create" && scene.value.existingScene;
 });
-
-
 
 // Title disable only
 const isTitleDisabled = ref(false);
@@ -152,23 +144,16 @@ const isTitleDisabled = ref(false);
 watch(
   () => scene.value.existingScene,
   async (val) => {
-    // 🟢 CASE 1: "Select Scene" / empty  → behave like brand-new scene
-    if (!val || val === "Select Scene") {
-  const fresh = makeEmptyScene();
+    if (!val) {
+      isTitleDisabled.value = false;
+      scene.value = makeEmptyScene();
+      return;
+    }
 
-  // mutate instead of replace
-  Object.keys(fresh).forEach((key) => {
-    scene.value[key] = fresh[key];
-  });
-
-  scene.value.existingScene = "";
-  return;
-}
-
-    // 🟡 CASE 2: picked an existing scene → autofill from DB
     const data = existingScenesFull.value[val];
     if (!data) return;
 
+    // ⭐ Autofill first (UI updates)
     scene.value.title = data.title || "";
     scene.value.barangay = data.barangay || "";
     scene.value.category = data.category || "";
@@ -181,10 +166,15 @@ watch(
     scene.value.instagram = data.instagram || "";
     scene.value.tiktok = data.tiktok || "";
 
-    // only these stay custom per pano
     scene.value.location = "";
     scene.value.panorama = null;
     scene.value.previewUrl = null;
+
+    // ⭐ Wait for DOM update BEFORE disabling inputs
+    await nextTick();
+
+    // now lock everything
+    isTitleDisabled.value = true;
   }
 );
 
@@ -367,7 +357,7 @@ const updateScene = () => {
               "
             >
               <option value="">Select Scene</option>
-              <option v-for="(s,i) in existingScenes" :key="i" :value="s">{{ s }}</option>
+              <option v-for="(s,i) in existingScenes" :key="i">{{ s }}</option>
             </select>
           </div>
 
