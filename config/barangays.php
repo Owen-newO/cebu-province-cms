@@ -2,6 +2,7 @@
 
 return [
     'samboan' => [
+        "Barangay Basak",
         "Barangay Bonbon",
         "Barangay Bulangsuran",
         "Barangay Calatagan",
