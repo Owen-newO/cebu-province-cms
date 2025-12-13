@@ -52,5 +52,13 @@ class UserSeeder extends Seeder
                 'role' => 'aloguinsan',
             ]
         );
+         User::updateOrCreate(
+            ['email' => 'alegria@mata.cms'],
+            [
+                'name' => 'Alegria',
+                'password' => Hash::make('alegriaadmin'),
+                'role' => 'alegria',
+            ]
+        );
     }
 }
