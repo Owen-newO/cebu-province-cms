@@ -36,6 +36,14 @@ class UserSeeder extends Seeder
                 'role' => 'tuburan',
             ]
         );
+         User::updateOrCreate(
+            ['email' => 'ginatilan@mata.cms'],
+            [
+                'name' => 'Ginatilan',
+                'password' => Hash::make('ginatilanadmin'),
+                'role' => 'ginatilan',
+            ]
+        );
         User::updateOrCreate(
             ['email' => 'moalboal@mata.cms'],
             [
