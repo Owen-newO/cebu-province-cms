@@ -145,7 +145,15 @@ const handlePublishScene = (newScene) => {
     const response = await fetch("/dashboard");
   }, 800);
 };
+const getThumbnail = (path) => {
+  if (!path) return "/images/sample1.jpg";
 
+  // Example: if panorama_path = "panos/scene1.jpg"
+  // Thumbnail could be "panos/thumbs/scene1.jpg"
+  const parts = path.split("/");
+  const fileName = parts.pop();
+  return "/" + [...parts, "thumbs", fileName].join("/");
+};
 const handleSaveDraft = (draftScene) => {
   // Add new draft
   const newDraft = {
