@@ -145,7 +145,19 @@ const handlePublishScene = (newScene) => {
     const response = await fetch("/dashboard");
   }, 800);
 };
+const getThumbnail = (panoPath) => {
+  if (!panoPath) return "";
 
+  const parts = panoPath.split("/");
+
+  const file = parts.pop();
+
+  const sceneName = file.replace(/\.[^/.]+$/, ""); 
+
+  const base = parts.join("/");
+
+  return `${base}/panos/${sceneName}.tiles/thumb.jpg`;
+};
 const handleSaveDraft = (draftScene) => {
   // Add new draft
   const newDraft = {
