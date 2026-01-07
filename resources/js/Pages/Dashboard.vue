@@ -148,14 +148,12 @@ const handlePublishScene = (newScene) => {
 const getThumbnail = (path) => {
   if (!path) return "/images/sample1.jpg";
 
-  // Split the path into parts
-  const parts = path.split("/");
+  const parts = path.split("/");       // ["filecreated", "panos", "filecreated.jpg"]
+  const file = parts.pop();            // "filecreated.jpg"
+  const sceneName = file.replace(/\.[^/.]+$/, ""); // "filecreated"
+  const base = parts.join("/");        // "filecreated/panos"
 
-  // Remove the filename from the end
-  const fileName = parts.pop();
-
-  // Add the "tiles" folder and "thumb.jpg" file
-  return "/" + [...parts, "parts",parts.tile, "thumb.jpg"].join("/");
+  return `/${base}/${sceneName}.tiles/thumb.jpg`;
 };
 const handleSaveDraft = (draftScene) => {
   // Add new draft
