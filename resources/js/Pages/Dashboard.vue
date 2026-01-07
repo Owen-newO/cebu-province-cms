@@ -365,7 +365,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             ref="sceneModal"
           />
         </div>
-        <div v-if="activeFilterValue"  style="margin:10px 0 0 0; padding-left: 10%;">
+        <div v-if="activeFilterValue"  style="margin:10px 0 0 0; padding-left: 5%;">
             <span
               style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center;"
             >
