@@ -352,22 +352,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 </div>
               </div>
             </div>
-              <div v-if="activeFilterValue" style="margin-left:10px;">
-                  <span
-                    style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:flex; align-items:center;"
-                  >
-                    {{ activeFilterValue }}
-                    <span
-                      style="margin-left:8px; cursor:pointer; font-weight:bold;"
-                      @click="
-                        activeFilterValue = null;
-                        activeFilterType = 'all';
-                      "
-                    >
-                      ✕
-                    </span>
-                  </span>
-                </div>
+            
           </div>
 
           <addSceneModal
@@ -380,7 +365,24 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             ref="sceneModal"
           />
         </div>
-
+        <div v-if="activeFilterValue" style="margin:10px 0 0 0;">
+            <span
+              style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center;"
+            >
+              {{ activeFilterValue }}
+              <span
+                style="margin-left:8px; cursor:pointer; font-weight:bold;"
+                @click="
+                  activeFilterValue = null;
+                  activeFilterType = 'all';
+                  showBarangayDropdown = false;
+                  showCategoryDropdown = false;
+                "
+              >
+                ✕
+              </span>
+            </span>
+          </div>
         <!-- Back Button for Filtered Group -->
         <div
           v-if="activeGroupTitle"
