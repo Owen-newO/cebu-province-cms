@@ -355,7 +355,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             ref="sceneModal"
           />
         </div>
-        <div style="margin:10px 0 0 0; display:flex; gap:10px;">
+        <div style="margin:10px 0 0 0; display:flex; gap:10px; padding-left: 5%;">
             <span
               v-if="activeBarangay"
               style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center;"
