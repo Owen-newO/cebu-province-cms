@@ -3,6 +3,7 @@ import { ref, onMounted } from "vue";
 import { Head } from "@inertiajs/vue3";
 import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
+import { computed } from "vue";
 
 const props = defineProps({
   scenes: Array,
@@ -10,7 +11,11 @@ const props = defineProps({
   barangays: Array,
   municipal: String,
 });
+const activeFilterType = ref("all"); // all | barangay | category
+const activeFilterValue = ref(null);
 
+const showBarangayDropdown = ref(false);
+const showCategoryDropdown = ref(false);
 const scenes = ref([]);
 const drafts = ref([]);
 const allPublishedScenes = ref([]);
@@ -21,6 +26,24 @@ const showModal = ref(true);
 
 const sceneModal = ref(null);
 
+
+const filteredScenes = computed(() => {
+  let list = allPublishedScenes.value;
+
+  if (activeFilterType.value === "barangay" && activeFilterValue.value) {
+    list = list.filter(
+      (scene) => scene.barangay === activeFilterValue.value
+    );
+  }
+
+  if (activeFilterType.value === "category" && activeFilterValue.value) {
+    list = list.filter(
+      (scene) => scene.category === activeFilterValue.value
+    );
+  }
+
+  return groupByTitle(list);
+});
 const getThumbnail = (panoPath) => {
   if (!panoPath) return "";
 
@@ -251,26 +274,100 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           />
           <div style="display:flex; gap:10px;">
             <button
-              style="font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
-            >
-              All
-            </button>
+                @click="
+                  activeFilterType = 'all';
+                  activeFilterValue = null;
+                  showBarangayDropdown = false;
+                  showCategoryDropdown = false;
+                "
+                style="font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
+              >
+                All
+              </button>
+            <div style="position:relative;">
             <button
+              @click="
+                showBarangayDropdown = !showBarangayDropdown;
+                showCategoryDropdown = false;
+              "
               style="display:flex; font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
             >
               <img
                 src="/images/barangay_pin.png"
-                style="width:26px; height:18px; align-self:center; padding-right:8px;"
-              />Barangay
+                style="width:26px; height:18px; padding-right:8px;"
+              />
+              Barangay
             </button>
-            <button
-              style="display:flex; font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer; margin-right:20px;"
+
+            <!-- Dropdown -->
+            <div
+              v-if="showBarangayDropdown"
+              style="position:absolute; top:50px; left:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.15); width:220px; z-index:50;"
             >
-              <img
-                src="/images/barangay_tag.png"
-                style="width:26px; height:18px; align-self:center; padding-right:8px;"
-              />Category
-            </button>
+              <div
+                v-for="b in barangays"
+                :key="b"
+                @click="
+                  activeFilterType = 'barangay';
+                  activeFilterValue = b;
+                  showBarangayDropdown = false;
+                "
+                style="padding:10px 14px; cursor:pointer;"
+              >
+                {{ b }}
+              </div>
+            </div>
+          </div>
+            <div style="position:relative;">
+              <button
+                @click="
+                  showCategoryDropdown = !showCategoryDropdown;
+                  showBarangayDropdown = false;
+                "
+                style="display:flex; font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
+              >
+                <img
+                  src="/images/barangay_tag.png"
+                  style="width:26px; height:18px; padding-right:8px;"
+                />
+                Category
+              </button>
+
+              <!-- Dropdown -->
+              <div
+                v-if="showCategoryDropdown"
+                style="position:absolute; top:50px; left:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.15); width:260px; z-index:50;"
+              >
+                <div
+                  v-for="c in categories"
+                  :key="c"
+                  @click="
+                    activeFilterType = 'category';
+                    activeFilterValue = c;
+                    showCategoryDropdown = false;
+                  "
+                  style="padding:10px 14px; cursor:pointer;"
+                >
+                  {{ c }}
+                </div>
+              </div>
+            </div>
+              <div v-if="activeFilterValue" style="margin-left:10px;">
+                  <span
+                    style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:flex; align-items:center;"
+                  >
+                    {{ activeFilterValue }}
+                    <span
+                      style="margin-left:8px; cursor:pointer; font-weight:bold;"
+                      @click="
+                        activeFilterValue = null;
+                        activeFilterType = 'all';
+                      "
+                    >
+                      ✕
+                    </span>
+                  </span>
+                </div>
           </div>
 
           <addSceneModal
@@ -320,7 +417,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           style="padding:30px 40px; display:flex; flex-flow:row wrap; gap:30px; width:100%; justify-content:left; max-width:1600px; margin:0 auto;"
         >
           <div
-            v-for="scene in scenes"
+            v-for="scene in filteredScenes"
             :key="scene.id"
             style="background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px; width:32%; min-width:450px; flex-direction:column; justify-content:space-between;"
           >

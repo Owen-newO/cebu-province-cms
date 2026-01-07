@@ -771,7 +771,7 @@ class SceneController extends Controller
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
-        $text      = strtoupper(str_replace('_', ' ', $sceneTitle));
+        $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
 
         $layer = "
