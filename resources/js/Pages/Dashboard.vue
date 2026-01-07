@@ -155,7 +155,7 @@ const getThumbnail = (path) => {
   const fileName = parts.pop();
 
   // Add the "tiles" folder and "thumb.jpg" file
-  return "/" + [...parts, "tiles", "thumb.jpg"].join("/");
+  return "/" + [...parts, "parts",parts.tile, "thumb.jpg"].join("/");
 };
 const handleSaveDraft = (draftScene) => {
   // Add new draft
