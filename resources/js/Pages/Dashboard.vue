@@ -148,10 +148,24 @@ const handlePublishScene = (newScene) => {
 const getThumbnail = (path) => {
   if (!path) return "/images/sample1.jpg";
 
-  const parts = path.split("/");       // ["filecreated", "panos", "filecreated.jpg"]
-  const file = parts.pop();            // "filecreated.jpg"
-  const sceneName = file.replace(/\.[^/.]+$/, ""); // "filecreated"
-  const base = parts.join("/");        // "filecreated/panos"
+  // If already a full URL (like S3), keep the domain
+  let url;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    url = new URL(path); // parses full URL
+    const parts = url.pathname.split("/"); // split path
+    const file = parts.pop();              // get filename
+    const sceneName = file.replace(/\.[^/.]+$/, ""); // remove extension
+    const base = parts.join("/");          // get folder path
+
+    url.pathname = `${base}/${sceneName}.tiles/thumb.jpg`;
+    return url.toString();
+  }
+
+  // Local path
+  const parts = path.split("/");
+  const file = parts.pop();
+  const sceneName = file.replace(/\.[^/.]+$/, "");
+  const base = parts.join("/");
 
   return `/${base}/${sceneName}.tiles/thumb.jpg`;
 };
