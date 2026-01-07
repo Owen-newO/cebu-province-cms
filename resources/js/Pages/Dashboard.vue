@@ -11,9 +11,8 @@ const props = defineProps({
   barangays: Array,
   municipal: String,
 });
-const activeFilterType = ref("all"); // all | barangay | category
-const activeFilterValue = ref(null);
-
+const activeBarangay = ref(null);
+const activeCategory = ref(null);
 const showBarangayDropdown = ref(false);
 const showCategoryDropdown = ref(false);
 const scenes = ref([]);
