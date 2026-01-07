@@ -27,17 +27,15 @@ const sceneModal = ref(null);
 
 
 const filteredScenes = computed(() => {
-  return groupByTitle(
-    allPublishedScenes.value.filter((scene) => {
-      const barangayMatch = activeBarangay.value
-        ? scene.barangay === activeBarangay.value
-        : true;
-      const categoryMatch = activeCategory.value
-        ? scene.category === activeCategory.value
-        : true;
-      return barangayMatch && categoryMatch;
-    })
-  );
+  return scenes.value.filter((scene) => {
+    const barangayMatch = activeBarangay.value
+      ? scene.barangay === activeBarangay.value
+      : true;
+    const categoryMatch = activeCategory.value
+      ? scene.category === activeCategory.value
+      : true;
+    return barangayMatch && categoryMatch;
+  });
 });
 
 // ✅ Helper to normalize image URLs (S3 or local)
