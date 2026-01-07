@@ -28,35 +28,18 @@ const sceneModal = ref(null);
 
 
 const filteredScenes = computed(() => {
-  let list = allPublishedScenes.value;
-
-  if (activeFilterType.value === "barangay" && activeFilterValue.value) {
-    list = list.filter(
-      (scene) => scene.barangay === activeFilterValue.value
-    );
-  }
-
-  if (activeFilterType.value === "category" && activeFilterValue.value) {
-    list = list.filter(
-      (scene) => scene.category === activeFilterValue.value
-    );
-  }
-
-  return groupByTitle(list);
+  return groupByTitle(
+    allPublishedScenes.value.filter((scene) => {
+      const barangayMatch = activeBarangay.value
+        ? scene.barangay === activeBarangay.value
+        : true;
+      const categoryMatch = activeCategory.value
+        ? scene.category === activeCategory.value
+        : true;
+      return barangayMatch && categoryMatch;
+    })
+  );
 });
-const getThumbnail = (panoPath) => {
-  if (!panoPath) return "";
-
-  const parts = panoPath.split("/");
-
-  const file = parts.pop();
-
-  const sceneName = file.replace(/\.[^/.]+$/, ""); 
-
-  const base = parts.join("/");
-
-  return `${base}/panos/${sceneName}.tiles/thumb.jpg`;
-};
 
 // ✅ Helper to normalize image URLs (S3 or local)
 const getImageUrl = (path) => {
@@ -274,16 +257,16 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           />
           <div style="display:flex; gap:10px;">
             <button
-                @click="
-                  activeFilterType = 'all';
-                  activeFilterValue = null;
-                  showBarangayDropdown = false;
-                  showCategoryDropdown = false;
-                "
-                style="font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
-              >
-                All
-              </button>
+              @click="
+                activeBarangay = null;
+                activeCategory = null;
+                showBarangayDropdown = false;
+                showCategoryDropdown = false;
+              "
+              style="font-size:18px; padding:8px 30px; background-color:#f3f4f6; border-radius:20px; border:none; cursor:pointer;"
+            >
+              All
+            </button>
             <div style="position:relative;">
             <button
               @click="
@@ -305,17 +288,16 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               style="position:absolute; top:50px; left:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.15); width:220px; z-index:50;"
             >
               <div
-                v-for="b in barangays"
-                :key="b"
-                @click="
-                  activeFilterType = 'barangay';
-                  activeFilterValue = b;
-                  showBarangayDropdown = false;
-                "
-                style="padding:10px 14px; cursor:pointer;"
-              >
-                {{ b }}
-              </div>
+                  v-for="b in barangays"
+                  :key="b"
+                  @click="
+                    activeBarangay = b;
+                    showBarangayDropdown = false;
+                  "
+                  style="padding:10px 14px; cursor:pointer;"
+                >
+                  {{ b }}
+                </div>
             </div>
           </div>
             <div style="position:relative;">
@@ -339,17 +321,16 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 style="position:absolute; top:50px; left:0; background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,0.15); width:260px; z-index:50;"
               >
                 <div
-                  v-for="c in categories"
-                  :key="c"
-                  @click="
-                    activeFilterType = 'category';
-                    activeFilterValue = c;
-                    showCategoryDropdown = false;
-                  "
-                  style="padding:10px 14px; cursor:pointer;"
-                >
-                  {{ c }}
-                </div>
+                v-for="c in categories"
+                :key="c"
+                @click="
+                  activeCategory = c;
+                  showCategoryDropdown = false;
+                "
+                style="padding:10px 14px; cursor:pointer;"
+              >
+                {{ c }}
+              </div>
               </div>
             </div>
             
@@ -365,22 +346,27 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             ref="sceneModal"
           />
         </div>
-        <div v-if="activeFilterValue"  style="margin:10px 0 0 0; padding-left: 5%;">
+        <div style="margin:10px 0 0 0; display:flex; gap:10px;">
             <span
+              v-if="activeBarangay"
               style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center;"
             >
-              {{ activeFilterValue }}
+              Barangay: {{ activeBarangay }}
               <span
                 style="margin-left:8px; cursor:pointer; font-weight:bold;"
-                @click="
-                  activeFilterValue = null;
-                  activeFilterType = 'all';
-                  showBarangayDropdown = false;
-                  showCategoryDropdown = false;
-                "
-              >
-                ✕
-              </span>
+                @click="activeBarangay = null"
+              >✕</span>
+            </span>
+
+            <span
+              v-if="activeCategory"
+              style="background:#2563eb; color:white; padding:6px 14px; border-radius:20px; display:inline-flex; align-items:center;"
+            >
+              Category: {{ activeCategory }}
+              <span
+                style="margin-left:8px; cursor:pointer; font-weight:bold;"
+                @click="activeCategory = null"
+              >✕</span>
             </span>
           </div>
         <!-- Back Button for Filtered Group -->
