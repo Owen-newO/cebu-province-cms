@@ -78,12 +78,14 @@ class ProcessPanorama implements ShouldQueue
             $s3Key = ltrim($parsed['path'], '/');
             $localPano = $tempDir . DIRECTORY_SEPARATOR . 'panorama.jpg';
 
-            $client = Storage::disk('s3')->getDriver()->getAdapter()->getClient();
-            $client->getObject([
-                'Bucket' => config('filesystems.disks.s3.bucket'),
-                'Key'    => $s3Key,
-                'SaveAs' => $localPano,
-            ]);
+            $stream = Storage::disk('s3')->readStream($s3Key);
+
+                if ($stream === false) {
+                    throw new \RuntimeException("Failed to read panorama from S3: {$s3Key}");
+                }
+
+                file_put_contents($localPano, stream_get_contents($stream));
+                fclose($stream);
 
             if (!file_exists($localPano) || filesize($localPano) === 0) {
                 throw new \RuntimeException('Downloaded panorama is missing/empty');
