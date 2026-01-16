@@ -26,6 +26,7 @@ class ProcessPanorama implements ShouldQueue
     public function handle(): void
     {
         $scene = Scene::find($this->sceneId);
+
         if (!$scene) {
             Log::warning('ProcessPanorama: scene not found', ['scene_id' => $this->sceneId]);
             return;
@@ -46,17 +47,18 @@ class ProcessPanorama implements ShouldQueue
 
             /* -------------------------------------------------
              | IDENTIFIERS / PATHS
+             | IMPORTANT: use ONE stable identifier everywhere.
+             | We use DB id, not scene_id, not filename.
              ------------------------------------------------- */
-            $sceneKey = $scene->scene_id ?: (string) $scene->id;
-            $sceneKey = preg_replace('/[^A-Za-z0-9_\-]/', '_', $sceneKey);
+            $sceneKey = (string) $scene->id;
 
-            // Prefer municipal_slug if you have it, else municipal
-            $municipalSlug = $scene->municipal_slug ?? $scene->municipal;
-            $municipalSlug = trim((string) $municipalSlug);
+            $municipalSlug = (string)($scene->municipal_slug ?? $scene->municipal ?? '');
+            $municipalSlug = strtolower(trim($municipalSlug));
             if ($municipalSlug === '') {
                 throw new \RuntimeException('Missing municipal/municipal_slug on scene');
             }
 
+            // S3 base path where this scene's vtour lives
             $basePath = "{$municipalSlug}/{$sceneKey}";
 
             $tempDir = storage_path("app/tmp_scenes/{$sceneKey}");
@@ -88,6 +90,8 @@ class ProcessPanorama implements ShouldQueue
 
             /* -------------------------------------------------
              | KRPANO EXECUTION
+             | IMPORTANT: krpano outputs ./vtour relative to CWD.
+             | So we MUST set working directory to $tempDir.
              ------------------------------------------------- */
             $krpanoTool = $isWindows
                 ? base_path('krpanotools/krpanotools.exe')
@@ -115,6 +119,7 @@ class ProcessPanorama implements ShouldQueue
                 $localPano,
             ]);
 
+            $process->setWorkingDirectory($tempDir);
             $process->setTimeout(1800); // 30 minutes
             $process->run();
 
@@ -124,6 +129,8 @@ class ProcessPanorama implements ShouldQueue
 
             /* -------------------------------------------------
              | PARSE GENERATED tour.xml (SOURCE OF TRUTH)
+             | Krpano vtour.xml scene name likely != sceneKey.
+             | So we DO NOT search by name; we just read FIRST scene.
              ------------------------------------------------- */
             $generatedTourXml = $tempDir . DIRECTORY_SEPARATOR . 'vtour' . DIRECTORY_SEPARATOR . 'tour.xml';
             if (!file_exists($generatedTourXml)) {
@@ -135,21 +142,21 @@ class ProcessPanorama implements ShouldQueue
                 throw new \RuntimeException('Failed parsing krpano tour.xml');
             }
 
-            $target = strtolower($sceneKey);
-            $thumbRel = $previewRel = $cubeRel = $multires = '';
+            if (!isset($xml->scene[0])) {
+                throw new \RuntimeException('No <scene> found in krpano output tour.xml');
+            }
 
-            foreach ($xml->scene as $sceneNode) {
-                $name = strtolower((string) $sceneNode['name']);
-                if ($name !== $target) continue;
+            $sceneNode = $xml->scene[0];
 
-                $thumbRel   = ltrim((string) ($sceneNode['thumburl'] ?? ''), '/');
-                $previewRel = $sceneNode->preview ? ltrim((string) $sceneNode->preview['url'], '/') : '';
+            $thumbRel   = ltrim((string)($sceneNode['thumburl'] ?? ''), '/');
+            $previewRel = $sceneNode->preview ? ltrim((string)$sceneNode->preview['url'], '/') : '';
 
-                if ($sceneNode->image && $sceneNode->image->cube) {
-                    $cubeRel  = ltrim((string) $sceneNode->image->cube['url'], '/');
-                    $multires = (string) $sceneNode->image->cube['multires'];
-                }
-                break;
+            $cubeRel = '';
+            $multires = '';
+
+            if ($sceneNode->image && $sceneNode->image->cube) {
+                $cubeRel  = ltrim((string)$sceneNode->image->cube['url'], '/');
+                $multires = (string)$sceneNode->image->cube['multires'];
             }
 
             if ($cubeRel === '') {
@@ -167,21 +174,10 @@ class ProcessPanorama implements ShouldQueue
             $this->uploadFolderToS3($vtourDir, $basePath);
 
             /* -------------------------------------------------
-             | BUILD FINAL URLs (PUBLIC)
+             | UPDATE MASTER tour.xml ON S3 (municipal/tour.xml)
+             | Inject sceneKey as the new scene name to match DB.
+             | IMPORTANT: keep paths RELATIVE in xml.
              ------------------------------------------------- */
-            $thumbUrl   = $thumbRel   ? Storage::disk('s3')->url("{$basePath}/{$thumbRel}")   : null;
-            $previewUrl = $previewRel ? Storage::disk('s3')->url("{$basePath}/{$previewRel}") : null;
-
-            // Keep cube url in krpano format. If you store absolute, it breaks %s/%0v placeholders.
-            // So store as "https://bucket/.../panos/.../%s/..." by prefixing basePath.
-            $cubeUrl = Storage::disk('s3')->url("{$basePath}/{$cubeRel}");
-
-            /* -------------------------------------------------
-             | APPEND TO MASTER TOUR.XML (ON S3 OR LOCAL)
-             | If you keep master tour.xml on S3, update there.
-             ------------------------------------------------- */
-
-            // If your master tour.xml is on S3: "{$municipalSlug}/tour.xml"
             $masterKey = "{$municipalSlug}/tour.xml";
 
             if (!Storage::disk('s3')->exists($masterKey)) {
@@ -190,40 +186,47 @@ class ProcessPanorama implements ShouldQueue
 
             $masterXml = Storage::disk('s3')->get($masterKey);
 
-            $title = htmlspecialchars((string) ($scene->title ?? ''), ENT_QUOTES);
-            $sub   = htmlspecialchars((string) ($scene->location ?? ''), ENT_QUOTES);
-
-            $newScene = "\n<scene name=\"{$sceneKey}\" title=\"{$title}\" subtitle=\"{$sub}\" thumburl=\"{$thumbRel}\">\n"
-                . "    <view hlookat=\"0\" vlookat=\"0\" fov=\"90\" />\n"
-                . "    <preview url=\"{$previewRel}\" />\n"
-                . "    <image>\n"
-                . "        <cube url=\"{$cubeRel}\" multires=\"{$multires}\" />\n"
-                . "    </image>\n"
-                . "</scene>\n";
-
+            // avoid duplicates
             if (!str_contains($masterXml, "name=\"{$sceneKey}\"")) {
+                $title = htmlspecialchars((string)($scene->title ?? ''), ENT_QUOTES);
+                $sub   = htmlspecialchars((string)($scene->location ?? ''), ENT_QUOTES);
+
+                // IMPORTANT: prefix relative paths so they point to this scene folder
+                // because master tour.xml sits at: s3://{municipal}/tour.xml
+                // and scene assets sit at: s3://{municipal}/{sceneKey}/vtour/...
+                $thumbInMaster   = "{$sceneKey}/vtour/{$thumbRel}";
+                $previewInMaster = "{$sceneKey}/vtour/{$previewRel}";
+                $cubeInMaster    = "{$sceneKey}/vtour/{$cubeRel}";
+
+                $newScene = "\n<scene name=\"{$sceneKey}\" title=\"{$title}\" subtitle=\"{$sub}\" thumburl=\"{$thumbInMaster}\">\n"
+                    . "    <view hlookat=\"0\" vlookat=\"0\" fov=\"90\" />\n"
+                    . "    <preview url=\"{$previewInMaster}\" />\n"
+                    . "    <image>\n"
+                    . "        <cube url=\"{$cubeInMaster}\" multires=\"{$multires}\" />\n"
+                    . "    </image>\n"
+                    . "</scene>\n";
+
                 $masterXml = str_replace('</krpano>', $newScene . '</krpano>', $masterXml);
                 Storage::disk('s3')->put($masterKey, $masterXml);
             }
 
             /* -------------------------------------------------
-             | UPDATE DB + CLEANUP
+             | FINAL DB UPDATE
              ------------------------------------------------- */
             $scene->update([
-                'status' => 'done',
-                // Optional: save derived URLs if you have columns for them
-                // 'thumb_url' => $thumbUrl,
-                // 'preview_url' => $previewUrl,
-                // 'cube_url' => $cubeUrl,
+                'status'   => 'done',
+                'scene_id' => $sceneKey, // optional but makes everything consistent
             ]);
 
             Log::info('✅ Panorama processed successfully', [
-                'scene_id'  => $scene->id,
-                'basePath'  => $basePath,
-                'thumbRel'  => $thumbRel,
-                'previewRel'=> $previewRel,
-                'cubeRel'   => $cubeRel,
-                'multires'  => $multires,
+                'scene_id'   => $scene->id,
+                'sceneKey'   => $sceneKey,
+                'basePath'   => $basePath,
+                'masterKey'  => $masterKey,
+                'thumbRel'   => $thumbRel,
+                'previewRel' => $previewRel,
+                'cubeRel'    => $cubeRel,
+                'multires'   => $multires,
             ]);
 
         } catch (\Throwable $e) {
@@ -258,7 +261,7 @@ class ProcessPanorama implements ShouldQueue
             $relPath  = ltrim(str_replace($localDir, '', $fullPath), DIRECTORY_SEPARATOR);
             $relPath  = str_replace(DIRECTORY_SEPARATOR, '/', $relPath);
 
-            $key = "{$s3Prefix}/{$relPath}";
+            $key = "{$s3Prefix}/vtour/{$relPath}";
 
             Storage::disk('s3')->put($key, fopen($fullPath, 'r'));
         }
@@ -272,11 +275,8 @@ class ProcessPanorama implements ShouldQueue
             if ($item === '.' || $item === '..') continue;
             $path = $dir . DIRECTORY_SEPARATOR . $item;
 
-            if (is_dir($path)) {
-                $this->deleteDir($path);
-            } else {
-                @unlink($path);
-            }
+            if (is_dir($path)) $this->deleteDir($path);
+            else @unlink($path);
         }
 
         @rmdir($dir);
