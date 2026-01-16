@@ -91,108 +91,50 @@ class SceneController extends Controller
     // STORE
     // -----------------------------------------------------------
     public function store(Request $request)
-    {
+{
+    $validated = $this->validateScene($request);
 
-        $validated = $this->validateScene($request);
-        $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
-        $validated['contact_number']  = $request->contact_number;
-        $validated['email']           = $request->email;
-        $validated['website']         = $request->website;
-        $validated['facebook']        = $request->facebook;
-        $validated['instagram']       = $request->instagram;
-        $validated['tiktok']          = $request->tiktok;
-        $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
+    $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
+    $validated['contact_number']  = $request->contact_number;
+    $validated['email']           = $request->email;
+    $validated['website']         = $request->website;
+    $validated['facebook']        = $request->facebook;
+    $validated['instagram']       = $request->instagram;
+    $validated['tiktok']          = $request->tiktok;
+    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
-        $file = $request->file('panorama');
-        $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
+    /* ---------------------------------
+     | Upload panorama to S3
+     --------------------------------- */
+    $file = $request->file('panorama');
+    $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
 
-        $sceneId       = pathinfo($filename, PATHINFO_FILENAME);
-        $municipalSlug = $this->municipalSlug($validated['municipal']);
+    $sceneKey = pathinfo($filename, PATHINFO_FILENAME);
+    $municipalSlug = $this->municipalSlug($validated['municipal']);
+    $basePath = "{$municipalSlug}/{$sceneKey}";
 
-        // S3 base path: {municipal}/{sceneId}
-        $basePath = "{$municipalSlug}/{$sceneId}";
+    $originalKey = "{$basePath}/{$filename}";
+    Storage::disk('s3')->put($originalKey, file_get_contents($file));
 
-        // TEMP FOLDER (local krpano workspace)
-        $tempDir = storage_path("app/tmp_scenes/{$sceneId}");
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
+    $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
 
-        $tempPanorama = $tempDir . DIRECTORY_SEPARATOR . $filename;
-        $file->move($tempDir, $filename);
+    /* ---------------------------------
+     | Create scene (queued)
+     --------------------------------- */
+    $validated['scene_id'] = $sceneKey;
+    $validated['status']   = 'queued';
 
-        Log::info('🎞️ Scene upload started', [
-            'sceneId'       => $sceneId,
-            'municipalSlug' => $municipalSlug,
-            'tempDir'       => $tempDir,
-            'tempPanorama'  => $tempPanorama,
-            's3_base_path'  => $basePath,
-        ]);
+    $scene = Scene::create($validated);
 
-        // ✅ Upload original panorama to S3 (so panorama_path actually exists there)
-        $originalKey = "{$basePath}/{$filename}";
-        try {
-            Storage::disk('s3')->put($originalKey, file_get_contents($tempPanorama));
-            Log::info('✅ Original panorama uploaded to S3', [
-                'key' => $originalKey,
-            ]);
-        } catch (\Throwable $e) {
-            Log::error('❌ Failed uploading original panorama to S3', [
-                'key'   => $originalKey,
-                'error' => $e->getMessage(),
-            ]);
-        }
+    /* ---------------------------------
+     | Dispatch background job
+     --------------------------------- */
+    \App\Jobs\ProcessPanorama::dispatch($scene->id);
 
-        // DB reference (points to S3 path)
-        $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
-        $scene = Scene::create($validated);
-
-        // RUN KRPANO (this MUST create {$tempDir}/vtour/...)
-        $this->runKrpano($tempPanorama);
-
-        // 🔍 Read krpano-generated local tour.xml to get real thumb/preview/cube/multires
-        $localTourXml = $tempDir . DIRECTORY_SEPARATOR . 'vtour' . DIRECTORY_SEPARATOR . 'tour.xml';
-        $config = $this->extractKrpanoSceneConfig($sceneId, $localTourXml);
-
-        if ($config) {
-            // krpano paths are relative, e.g. "panos/1763...tiles/preview.jpg"
-            $thumbRel   = ltrim($config['thumb']   ?? '', '/');
-            $previewRel = ltrim($config['preview'] ?? '', '/');
-            $cubeRel    = ltrim($config['cube']    ?? '', '/');
-            $multires   = $config['multires']      ?? '';
-
-            // Final S3 URLs: https://.../{municipal}/{sceneId}/{krpano-relative-path}
-            $thumb   = Storage::disk('s3')->url("{$basePath}/{$thumbRel}");
-            $preview = Storage::disk('s3')->url("{$basePath}/{$previewRel}");
-            $cubeUrl = Storage::disk('s3')->url("{$basePath}/{$cubeRel}");
-        } else {
-            // Fallback if parsing fails
-            $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
-            $thumb    = "{$tileBase}/thumb.jpg";
-            $preview  = "{$tileBase}/preview.jpg";
-            $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
-            $multires = '512,1024,2048';
-        }
-
-        Log::info('🧩 Computed S3 URLs for scene', [
-            'sceneId'  => $sceneId,
-            'thumb'    => $thumb ?? null,
-            'preview'  => $preview ?? null,
-            'cubeUrl'  => $cubeUrl ?? null,
-            'multires' => $multires ?? null,
-        ]);
-
-        // UPLOAD KRPANO OUTPUT: local: {tempDir}/vtour → S3: {basePath}/...
-        $this->uploadFolderToS3($tempDir . DIRECTORY_SEPARATOR . 'vtour', $basePath);
-
-        // CLEAN TEMP
-        $this->deleteLocalFolder($tempDir);
-
-        // UPDATE tour.xml + layer (use krpano's real cube url + multires) — MUNICIPAL-AWARE (on S3)
-        $this->appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
-
-        return redirect()->route('Dashboard')->with('success', 'Scene uploaded!');
-    }
+    return redirect()
+        ->route('Dashboard')
+        ->with('success', 'Scene uploaded. Processing panorama in background.');
+}
 
     // -----------------------------------------------------------
     // INDEX

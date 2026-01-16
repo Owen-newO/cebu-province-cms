@@ -11,6 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
+use App\Http\Controllers\SceneController;
 
 class ProcessPanorama implements ShouldQueue
 {
@@ -172,7 +173,42 @@ class ProcessPanorama implements ShouldQueue
             }
 
             $this->uploadFolderToS3($vtourDir, $basePath);
+            // -------------------------------------------------
+                // INJECT SCENE + LAYERS USING EXISTING CONTROLLER LOGIC
+                // -------------------------------------------------
+                $controller = app(SceneController::class);
 
+                // IMPORTANT:
+                // sceneId must match DB id because your XML uses:
+                // linkedscene="scene_{$sceneId}"
+                $sceneId = $scene->id;
+
+                // Use the SAME validated-style array your controller expects
+                $validated = [
+                    'title'           => $scene->title,
+                    'location'        => $scene->location,
+                    'barangay'        => $scene->barangay,
+                    'category'        => $scene->category,
+                    'address'         => $scene->address,
+                    'google_map_link' => $scene->google_map_link,
+                    'contact_number'  => $scene->contact_number,
+                    'email'           => $scene->email,
+                    'website'         => $scene->website,
+                    'facebook'        => $scene->facebook,
+                    'instagram'       => $scene->instagram,
+                    'tiktok'          => $scene->tiktok,
+                ];
+
+                // Inject everything exactly like before
+                $controller->appendSceneToXml(
+                    $sceneId,
+                    $validated,
+                    $thumbInMaster,
+                    $previewInMaster,
+                    $cubeInMaster,
+                    $multires,
+                    $municipalSlug
+                );
             /* -------------------------------------------------
              | UPDATE MASTER tour.xml ON S3 (municipal/tour.xml)
              | Inject sceneKey as the new scene name to match DB.
@@ -215,7 +251,7 @@ class ProcessPanorama implements ShouldQueue
              ------------------------------------------------- */
             $scene->update([
                 'status'   => 'done',
-                'scene_id' => $sceneKey, // optional but makes everything consistent
+                'scene_id' => (string) $scene->id,
             ]);
 
             Log::info('✅ Panorama processed successfully', [
