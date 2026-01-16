@@ -6,28 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
-{
-    Schema::table('scenes', function (Blueprint $table) {
-        if (!Schema::hasColumn('scenes', 'scene_id')) {
-            $table->string('scene_id')->nullable()->index();
-        }
+    {
+        Schema::table('scenes', function (Blueprint $table) {
+            //
+        });
+    }
 
-        if (!Schema::hasColumn('scenes', 'status')) {
-            $table->string('status')->default('queued')->index();
-        }
-    });
-}
-public function down(): void
-{
-    Schema::table('scenes', function (Blueprint $table) {
-        if (Schema::hasColumn('scenes', 'scene_id')) {
-            $table->dropColumn('scene_id');
-        }
-
-        if (Schema::hasColumn('scenes', 'status')) {
-            $table->dropColumn('status');
-        }
-    });
-}
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('scenes', function (Blueprint $table) {
+            //
+        });
+    }
 };
