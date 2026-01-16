@@ -419,34 +419,36 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
         <div
           style="padding:30px 40px; display:flex; flex-flow:row wrap; gap:30px; width:100%; justify-content:left; max-width:1600px; margin:0 auto;"
         >
-        <div v-if="scene.status !== 'done'" style="margin-bottom:8px;">
-  <span
-    v-if="scene.status === 'queued'"
-    style="background:#eab308;padding:6px 12px;border-radius:14px;"
-  >
-    Queued…
-  </span>
-
-  <span
-    v-if="scene.status === 'processing'"
-    style="background:#3b82f6;color:white;padding:6px 12px;border-radius:14px;"
-  >
-    Processing panorama…
-  </span>
-
-  <span
-    v-if="scene.status === 'failed'"
-    style="background:#ef4444;color:white;padding:6px 12px;border-radius:14px;"
-  >
-    Processing failed
-  </span>
-</div>
+       
 
           <div
             v-for="scene in filteredScenes"
             :key="scene.id"
             style="background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px; width:32%; min-width:450px; flex-direction:column; justify-content:space-between;"
           >
+
+           <div v-if="scene.status !== 'done'" style="margin-bottom:8px;">
+                <span
+                  v-if="scene.status === 'queued'"
+                  style="background:#eab308;padding:6px 12px;border-radius:14px;"
+                >
+                  Queued…
+                </span>
+
+                <span
+                  v-if="scene.status === 'processing'"
+                  style="background:#3b82f6;color:white;padding:6px 12px;border-radius:14px;"
+                >
+                  Processing panorama…
+                </span>
+
+                <span
+                  v-if="scene.status === 'failed'"
+                  style="background:#ef4444;color:white;padding:6px 12px;border-radius:14px;"
+                >
+                  Processing failed
+                </span>
+              </div>
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <img
@@ -531,14 +533,12 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
-                <button
-  @click="sceneModal && sceneModal.openForEdit(scene)"
-  :disabled="scene.status !== 'done'"
-  :style="scene.status !== 'done'
-    ? 'opacity:0.5;pointer-events:none'
-    : ''"
->
-                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+               <button
+                  @click="sceneModal && sceneModal.openForEdit(scene)"
+                  :disabled="scene.status !== 'done'"
+                  :style="scene.status !== 'done'
+                    ? 'opacity:0.5;pointer-events:none'
+                    : 'flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;'"
                 >
                   <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
                 </button>
