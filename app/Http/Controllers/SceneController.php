@@ -8,10 +8,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
-<<<<<<< HEAD
-=======
-use App\Jobs\ProcessPanorama;
->>>>>>> parent of 9399040 (back)
 
 class SceneController extends Controller
 {
