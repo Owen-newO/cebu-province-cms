@@ -27,10 +27,10 @@ class DashboardController extends Controller
             ->get();
 
         return Inertia::render('Dashboard', [
-    'scenes'     => $scenes,
-    'drafts'     => $drafts,
-    'barangays'  => $barangays,
-    'municipal'  => $municipalSlug, 
-]);
+            'scenes' => $scenes,
+            'drafts' => $drafts,
+            'municipal' => ucfirst($municipal),
+            'barangays' => $barangays,
+        ]);
     }
 }
