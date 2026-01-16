@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Scene;
 
@@ -11,27 +10,27 @@ class DashboardController extends Controller
     public function index()
     {
         $user = auth()->user();
+
+        // Normalize municipal
         $municipal = strtolower($user->role);
+
+        // Barangays config
         $barangays = config("barangays.$municipal", []);
 
-        $scenesQuery = Scene::where('municipal', $municipal);
-
-        $scenes = (clone $scenesQuery)
-            ->where('is_published', 1)
+        // Fetch ALL scenes for this municipal
+        $scenes = Scene::where('municipal', $municipal)
             ->latest()
             ->get();
 
-        $drafts = (clone $scenesQuery)
-            ->where('is_published', 0)
-            ->latest()
-            ->get();
+        // Split published vs drafts (no cloning queries needed)
+        $published = $scenes->where('is_published', 1)->values();
+        $drafts    = $scenes->where('is_published', 0)->values();
 
         return Inertia::render('Dashboard', [
-            'municipal' => ucfirst($municipal),
-    'scenes' => Scene::where('municipal', $municipal)->get(),
-    'drafts' => Scene::where('municipal', $municipal)
-                     ->where('status', 'draft')
-                     ->get(),
-]);
+            'scenes'     => $published,
+            'drafts'     => $drafts,
+            'municipal'  => ucfirst($municipal),
+            'barangays'  => $barangays,
+        ]);
     }
 }
