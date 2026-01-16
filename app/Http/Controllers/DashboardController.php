@@ -27,10 +27,10 @@ class DashboardController extends Controller
             ->get();
 
         return Inertia::render('Dashboard', [
-    'scenes' => Scene::where('municipal', $municipal)->get(),
-    'drafts' => Scene::where('municipal', $municipal)
-                     ->where('status', 'draft')
-                     ->get(),
+    'scenes'     => $scenes,
+    'drafts'     => $drafts,
+    'barangays'  => $barangays,
+    'municipal'  => $municipalSlug, 
 ]);
     }
 }

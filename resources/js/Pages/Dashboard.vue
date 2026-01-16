@@ -94,8 +94,19 @@ const groupByTitle = (list) => {
 
 // ✅ Initialize data on load
 onMounted(() => {
+  if (!props.municipal) {
+    console.warn("Municipal is missing, skipping polling");
+    return;
+  }
+
   const poll = setInterval(async () => {
     const res = await fetch(`/api/scenes/${props.municipal}`);
+
+    if (!res.ok) {
+      console.error("Failed to fetch scenes");
+      return;
+    }
+
     const data = await res.json();
 
     scenes.value = data.map((scene) => ({
@@ -105,7 +116,7 @@ onMounted(() => {
     }));
 
     const stillProcessing = data.some(
-      (s) => s.status === 'processing' || s.status === 'queued'
+      (s) => s.status === "queued" || s.status === "processing"
     );
 
     if (!stillProcessing) {
