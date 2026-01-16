@@ -94,18 +94,24 @@ const groupByTitle = (list) => {
 
 // ✅ Initialize data on load
 onMounted(() => {
-  allPublishedScenes.value = props.scenes.map((s) => ({
-    ...s,
-    img: getImageUrl(s.panorama_path),
-    date: new Date(s.created_at).toLocaleDateString(),
-  }));
-  scenes.value = groupByTitle(allPublishedScenes.value);
+  const poll = setInterval(async () => {
+    const res = await fetch(`/api/scenes/${props.municipal}`);
+    const data = await res.json();
 
-  drafts.value = props.drafts.map((s) => ({
-    ...s,
-    img: getImageUrl(s.panorama_path),
-    date: new Date(s.created_at).toLocaleDateString(),
-  }));
+    scenes.value = data.map((scene) => ({
+      ...scene,
+      img: getImageUrl(scene.panorama_path),
+      date: new Date(scene.created_at).toLocaleDateString(),
+    }));
+
+    const stillProcessing = data.some(
+      (s) => s.status === 'processing' || s.status === 'queued'
+    );
+
+    if (!stillProcessing) {
+      clearInterval(poll);
+    }
+  }, 5000);
 });
 
 // ✅ Group filter functions
