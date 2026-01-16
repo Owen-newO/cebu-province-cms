@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
-
 class SceneController extends Controller
 {
     // -----------------------------------------------------------
