@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
-use App\Jobs\ProcessPanorama;
+
 
 class SceneController extends Controller
 {
