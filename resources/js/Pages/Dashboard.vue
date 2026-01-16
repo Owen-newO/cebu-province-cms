@@ -94,34 +94,42 @@ const groupByTitle = (list) => {
 
 // ✅ Initialize data on load
 onMounted(() => {
-  if (!props.municipal) {
-    console.warn("Municipal is missing, skipping polling");
-    return;
-  }
+  // INITIAL RENDER
+  allPublishedScenes.value = props.scenes.map((scene) => ({
+    ...scene,
+    img: getImageUrl(scene.panorama_path),
+    date: new Date(scene.created_at).toLocaleDateString(),
+  }));
+
+  scenes.value = groupByTitle(allPublishedScenes.value);
+
+  drafts.value = props.drafts.map((scene) => ({
+    ...scene,
+    img: getImageUrl(scene.panorama_path),
+    date: new Date(scene.created_at).toLocaleDateString(),
+  }));
+
+  if (!props.municipal) return;
 
   const poll = setInterval(async () => {
     const res = await fetch(`/api/scenes/${props.municipal}`);
-
-    if (!res.ok) {
-      console.error("Failed to fetch scenes");
-      return;
-    }
+    if (!res.ok) return;
 
     const data = await res.json();
 
-    scenes.value = data.map((scene) => ({
+    allPublishedScenes.value = data.map((scene) => ({
       ...scene,
       img: getImageUrl(scene.panorama_path),
       date: new Date(scene.created_at).toLocaleDateString(),
     }));
 
+    scenes.value = groupByTitle(allPublishedScenes.value);
+
     const stillProcessing = data.some(
       (s) => s.status === "queued" || s.status === "processing"
     );
 
-    if (!stillProcessing) {
-      clearInterval(poll);
-    }
+    if (!stillProcessing) clearInterval(poll);
   }, 5000);
 });
 
