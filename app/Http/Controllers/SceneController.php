@@ -161,12 +161,12 @@ class SceneController extends Controller
             $multires   = $config['multires']      ?? '';
 
             // Final S3 URLs: https://.../{municipal}/{sceneId}/{krpano-relative-path}
-            $thumb   = Storage::disk('s3')->url("{$basePath}/{$thumbRel}");
-            $preview = Storage::disk('s3')->url("{$basePath}/{$previewRel}");
-            $cubeUrl = Storage::disk('s3')->url("{$basePath}/{$cubeRel}");
+            $thumb   = "{$sceneId}/{$thumbRel}";
+            $preview = "{$sceneId}/{$previewRel}";
+            $cubeUrl = "{$sceneId}/{$cubeRel}";
         } else {
             // Fallback if parsing fails
-            $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
+            $tileBase = "{$sceneId}/panos/{$sceneId}.tiles";
             $thumb    = "{$tileBase}/thumb.jpg";
             $preview  = "{$tileBase}/preview.jpg";
             $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
