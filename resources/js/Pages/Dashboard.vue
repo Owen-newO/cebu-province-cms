@@ -188,7 +188,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
       <div
         style="width:70px; height:70px; border-radius:50%; background-color:#1e293b; display:flex; justify-content:center; align-items:center; font-size:22px; font-weight:bold;"
       >
-        S
+        {{ municipal.charAt(0).toUpperCase() }}
       </div>
       <p style="margin-top:10px; font-size:18px;">Hi {{ municipal }}</p>
 
