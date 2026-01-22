@@ -931,7 +931,7 @@ class SceneController extends Controller
 
         $barangayLayer = "
     <layer 
-        name=\"barangay_text_{$barangay}\"
+        name=\"barangay_text_{$title}\"
         type=\"text\"
         text=\"{$barangay}\"
         width=\"100%\"
