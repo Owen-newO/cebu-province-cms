@@ -168,4 +168,21 @@ return [
         "Barangay Tomugpa ",
         
     ],
+    'ginatilan' => [
+        "Barangay Anao",
+        "Barangay Cagsing",
+        "Barangay Calabawan",
+        "Barangay Cambagte",
+        "Barangay Campisong",
+        "Barangay Cañorong",
+        "Barangay Guiwanon",
+        "Barangay Looc",
+        "Barangay Malatbo",
+        "Barangay Mangaco",
+        "Barangay Palanas",
+        "Barangay Poblacion",
+        "Barangay Salamanca",
+        "Barangay San Roque",
+    ],
+
 ];
