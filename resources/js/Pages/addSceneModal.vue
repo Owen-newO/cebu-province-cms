@@ -125,10 +125,62 @@ defineExpose({ openModal, openForEdit });
 // -----------------------------------------------------------
 const handleFileUpload = (e) => {
   const file = e.target.files[0];
-  if (file) {
-    scene.value.panorama = file;
-    scene.value.previewUrl = URL.createObjectURL(file);
-  }
+  if (!file) return;
+
+  const img = new Image();
+  const reader = new FileReader();
+
+  reader.onload = (ev) => {
+    img.src = ev.target.result;
+  };
+
+  img.onload = () => {
+    const MAX_WIDTH = 8192;
+    const MAX_HEIGHT = 4096;
+
+    let { width, height } = img;
+
+    // ✅ If within limits → do nothing
+    if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+      scene.value.panorama = file;
+      scene.value.previewUrl = URL.createObjectURL(file);
+      return;
+    }
+
+    // 🔽 Scale proportionally
+    const scale = Math.min(
+      MAX_WIDTH / width,
+      MAX_HEIGHT / height
+    );
+
+    const newWidth = Math.round(width * scale);
+    const newHeight = Math.round(height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+
+        const resizedFile = new File([blob], file.name, {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        });
+
+        scene.value.panorama = resizedFile;
+        scene.value.previewUrl = URL.createObjectURL(blob);
+      },
+      "image/jpeg",
+      0.92 // quality (safe for panoramas)
+    );
+  };
+
+  reader.readAsDataURL(file);
 };
 
 // -----------------------------------------------------------
