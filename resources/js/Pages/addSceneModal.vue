@@ -138,30 +138,25 @@ const handleFileUpload = (e) => {
     const MAX_WIDTH = 8192;
     const MAX_HEIGHT = 4096;
 
-    let { width, height } = img;
-
-    // ✅ If within limits → do nothing
-    if (width <= MAX_WIDTH && height <= MAX_HEIGHT) {
+    // 👇 below limits → keep original behavior
+    if (img.width <= MAX_WIDTH && img.height <= MAX_HEIGHT) {
       scene.value.panorama = file;
       scene.value.previewUrl = URL.createObjectURL(file);
       return;
     }
 
-    // 🔽 Scale proportionally
+    // 👇 rescale only if exceeded
     const scale = Math.min(
-      MAX_WIDTH / width,
-      MAX_HEIGHT / height
+      MAX_WIDTH / img.width,
+      MAX_HEIGHT / img.height
     );
 
-    const newWidth = Math.round(width * scale);
-    const newHeight = Math.round(height * scale);
-
     const canvas = document.createElement("canvas");
-    canvas.width = newWidth;
-    canvas.height = newHeight;
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
 
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(
       (blob) => {
@@ -176,7 +171,7 @@ const handleFileUpload = (e) => {
         scene.value.previewUrl = URL.createObjectURL(blob);
       },
       "image/jpeg",
-      0.92 // quality (safe for panoramas)
+      0.92
     );
   };
 
