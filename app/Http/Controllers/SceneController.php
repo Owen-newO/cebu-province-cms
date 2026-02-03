@@ -108,7 +108,7 @@ class SceneController extends Controller
 
     $municipalSlug = $this->municipalSlug($validated['municipal']);
     $basePath = "{$municipalSlug}/{$sceneId}";
-
+    $originalKey = "{$basePath}/{$filename}";
     // TEMP DIR
     $tempDir = storage_path("app/tmp_scenes/{$sceneId}");
     if (!file_exists($tempDir)) {
@@ -120,7 +120,7 @@ class SceneController extends Controller
 
     // upload original to S3
     Storage::disk('s3')->put(
-        "{$basePath}/{$filename}",
+        $originalKey,
         file_get_contents($tempPanoramaPath)
     );
 
