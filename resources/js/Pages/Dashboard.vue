@@ -4,6 +4,9 @@ import { Head } from "@inertiajs/vue3";
 import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed } from "vue";
+
+watch(showModal, v => console.log("Modal visible:", v));
+const toast = ref(null);
 const addOptimisticScene = (title) => {
   scenes.value.unshift({
     id: `temp-${Date.now()}`,
@@ -390,14 +393,14 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           </div>
 
           <addSceneModal
-            v-if="showModal"
-            @close="showModal = true"
-            @saveDraft="handleSaveDraft"
-            @publishScene="handlePublishScene"
-            :barangays="barangays"
-            :municipal="municipal"
-            ref="sceneModal"
-          />
+          v-if="showModal"
+          @close="showModal = false"
+          @saveDraft="handleSaveDraft"
+          @publishScene="handlePublishScene"
+          :barangays="barangays"
+          :municipal="municipal"
+          ref="sceneModal"
+        />
         </div>
         <div style="margin:10px 0 0 0; display:flex; gap:10px; padding-left: 5%;">
             <span
