@@ -4,7 +4,19 @@ import { Head } from "@inertiajs/vue3";
 import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed } from "vue";
-
+const addOptimisticScene = (title) => {
+  scenes.value.unshift({
+    id: `temp-${Date.now()}`,
+    title,
+    status: "queued",
+    barangay: "",
+    category: "",
+    location: "Uploading panorama…",
+    img: "/images/processing-placeholder.jpg",
+    date: new Date().toLocaleDateString(),
+    count: 1,
+  });
+};
 const props = defineProps({
   scenes: Array,
   drafts: Array,
@@ -159,13 +171,20 @@ const clearGroupFilter = () => {
 
 // ✅ Modal event handlers
 const handlePublishScene = (newScene) => {
+  // 🛑 If this is a queued job, do NOT inject final scene
+  if (newScene?.status === "queued" || newScene?.status === "processing") {
+    return;
+  }
+
+  // ✅ Existing behavior (UNCHANGED)
   scenes.value.unshift({
     ...newScene,
     date: new Date().toLocaleDateString(),
     img: getImageUrl(newScene.panorama_path),
   });
+
   setTimeout(async () => {
-    const response = await fetch("/dashboard");
+    await fetch("/dashboard");
   }, 800);
 };
 const getThumbnail = (panoPath) => {
@@ -539,6 +558,23 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                   />
                   View
                 </button>
+                <div
+    v-if="toast"
+    style="
+      position:fixed;
+      bottom:30px;
+      right:30px;
+      background:#111827;
+      color:white;
+      padding:14px 20px;
+      border-radius:12px;
+      font-size:14px;
+      z-index:9999;
+      box-shadow:0 10px 25px rgba(0,0,0,.25);
+    "
+  >
+    ⏳ {{ toast }}
+  </div>
               </template>
 
               <!-- Single Scene Buttons -->

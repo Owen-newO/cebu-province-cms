@@ -15,6 +15,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 const showModal = ref(false);
 const existingScenes = ref([]);
 const existingScenesFull = ref({}); // 👈 ADDED — store full existing scenes
+const showToast = ref(false);
+const toastMessage = ref("");
 
 // -----------------------------------------------------------
 // mode + editing
@@ -174,7 +176,6 @@ watch(() => scene.value.existingScene, (val) => {
 const submitScene = (isPublished) => {
   const formData = new FormData();
 
-  // Title must ALWAYS come from the input
   formData.append("title", scene.value.title);
 
   formData.append("municipal", props.municipal);
@@ -191,21 +192,26 @@ const submitScene = (isPublished) => {
   formData.append("tiktok", scene.value.tiktok);
   formData.append("is_published", isPublished ? "true" : "false");
 
-  if (scene.value.panorama)
+  if (scene.value.panorama) {
     formData.append("panorama", scene.value.panorama);
+  }
 
+  // ✅ Optimistic UI
+  closeModal();
+  toastMessage.value = "Scene queued. Processing in background…";
+  showToast.value = true;
 
-closeModal();
-
-// fire-and-forget request
-router.post(route("scenes.store"), formData, {
-  preserveScroll: true,
-  onSuccess: () => {
-    // optional: refresh list later if you want
-    window.location.reload();
-  },
-});
+  router.post(route("scenes.store"), formData, {
+    preserveScroll: true,
+    onFinish: () => {
+      // auto-hide toast after 3s
+      setTimeout(() => {
+        showToast.value = false;
+      }, 3000);
+    },
+  });
 };
+
 
 const saveDraft = () => submitScene(false);
 const publishScene = () => submitScene(true);
@@ -247,6 +253,7 @@ const updateScene = () => {
 </script>
 
 <template>
+  
   <!-- OPEN MODAL BUTTON -->
   <button
     @click="openModal"
