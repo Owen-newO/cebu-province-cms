@@ -44,7 +44,7 @@ class ScenePipelineService
         if (!file_exists($tourXmlPath)) {
             throw new \Exception('❌ KRPANO did not generate tour.xml');
         }
-
+        
         /* ================= 2️⃣ READ KRPANO CONFIG ================= */
 
         $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
@@ -109,47 +109,33 @@ class ScenePipelineService
      ===================================================== */
 
     private function runKrpano(string $localPanorama): void
-    {
-        $exe = base_path('krpanotools/krpanotools');
-        $config = base_path('krpanotools/templates/vtour-multires.config');
+{
+    $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
-        chdir(base_path());
+    $exe = $isWindows
+        ? base_path('krpanotools/krpanotools.exe')
+        : base_path('krpanotools/krpanotools');
 
-        $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
+    $config = base_path('krpanotools/templates/vtour-multires.config');
 
-        exec($cmd . " 2>&1", $out, $status);
+    // 🔑 CRITICAL: run krpano beside the panorama
+    chdir(dirname($localPanorama));
 
-        Log::info('🧩 KRPANO EXECUTED', [
-            'cmd' => $cmd,
-            'status' => $status,
-            'output' => $out,
-        ]);
+    $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
 
-        if ($status !== 0) {
-            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
-        }
+    exec($cmd . " 2>&1", $out, $status);
+
+    Log::info('🧩 KRPANO EXECUTION', [
+        'cmd'    => $cmd,
+        'cwd'    => getcwd(),
+        'status' => $status,
+        'output' => $out,
+    ]);
+
+    if ($status !== 0) {
+        throw new \Exception("❌ KRPANO failed: " . json_encode($out));
     }
-
-    private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
-    {
-        $xml = @simplexml_load_file($tourXmlPath);
-        if (!$xml) return null;
-
-        $target = 'scene_' . strtolower($sceneId);
-
-        foreach ($xml->scene as $scene) {
-            if (strtolower((string)$scene['name']) !== $target) continue;
-
-            return [
-                'thumb'    => (string)$scene['thumburl'],
-                'preview'  => (string)$scene->preview['url'],
-                'cube'     => (string)$scene->image->cube['url'],
-                'multires' => (string)$scene->image->cube['multires'],
-            ];
-        }
-
-        return null;
-    }
+}
 
     private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
     {
