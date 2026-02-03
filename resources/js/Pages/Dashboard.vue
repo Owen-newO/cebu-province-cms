@@ -3,7 +3,7 @@ import { ref, onMounted } from "vue";
 import { Head } from "@inertiajs/vue3";
 import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
-import { computed } from "vue";
+import { computed , watch } from "vue";
 
 watch(showModal, v => console.log("Modal visible:", v));
 const toast = ref(null);
