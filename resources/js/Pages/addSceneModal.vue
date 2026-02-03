@@ -194,13 +194,17 @@ const submitScene = (isPublished) => {
   if (scene.value.panorama)
     formData.append("panorama", scene.value.panorama);
 
-  router.post(route("scenes.store"), formData, {
-    preserveScroll: true,
-    onSuccess: () => {
-      closeModal();
-      window.location.reload();
-    },
-  });
+
+closeModal();
+
+// fire-and-forget request
+router.post(route("scenes.store"), formData, {
+  preserveScroll: true,
+  onSuccess: () => {
+    // optional: refresh list later if you want
+    window.location.reload();
+  },
+});
 };
 
 const saveDraft = () => submitScene(false);
