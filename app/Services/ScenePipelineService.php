@@ -45,7 +45,12 @@ class ScenePipelineService
             throw new \Exception('❌ KRPANO did not generate tour.xml');
         }
         
-        /* ================= 2️⃣ READ KRPANO CONFIG ================= */
+       
+        /* ================= 2️⃣ UPLOAD VT0UR TO S3 ================= */
+
+        $this->uploadFolderToS3($vtourPath, $basePath);
+
+        /* ================= 3️⃣  READ KRPANO CONFIG ================= */
 
         $config = $this->getStaticKrpanoConfig($basePath, $sceneId);
 
@@ -53,10 +58,6 @@ class ScenePipelineService
         $preview  = $config['preview'];
         $cubeUrl  = $config['cube'];
         $multires = $config['multires'];
-
-        /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
-
-        $this->uploadFolderToS3($vtourPath, $basePath);
 
         /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
 
