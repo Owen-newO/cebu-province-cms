@@ -47,22 +47,12 @@ class ScenePipelineService
         
         /* ================= 2️⃣ READ KRPANO CONFIG ================= */
 
-        $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
+        $config = $this->getStaticKrpanoConfig($basePath, $sceneId);
 
-        if ($config) {
-            $thumb    = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['thumb'], '/'));
-            $preview  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['preview'], '/'));
-            $cubeUrl  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['cube'], '/'));
-            $multires = $config['multires'];
-        } else {
-            Log::warning('⚠️ KRPANO config not found, using fallback URLs');
-
-            $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
-            $thumb    = "{$tileBase}/thumb.jpg";
-            $preview  = "{$tileBase}/preview.jpg";
-            $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
-            $multires = '512,1024,2048';
-        }
+        $thumb    = $config['thumb'];
+        $preview  = $config['preview'];
+        $cubeUrl  = $config['cube'];
+        $multires = $config['multires'];
 
         /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
@@ -84,7 +74,7 @@ class ScenePipelineService
             'scene_uid' => $sceneId,
         ]);
     }
-
+    
     public function updateSceneMeta(Scene $scene, array $validated): void
     {
         $sceneId = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
@@ -136,7 +126,17 @@ class ScenePipelineService
         throw new \Exception("❌ KRPANO failed: " . json_encode($out));
     }
 }
+private function getStaticKrpanoConfig(string $basePath, string $sceneId): array
+{
+    $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
 
+    return [
+        'thumb'    => "{$tileBase}/thumb.jpg",
+        'preview'  => "{$tileBase}/preview.jpg",
+        'cube'     => "{$tileBase}/%s/l%l/%0v/l%l_%s_%0v_%0h.jpg",
+        'multires' => '512,640,1152,2304,4736',
+    ];
+}
     private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
     {
         Log::info('⬆️ Uploading vtour to S3', [

@@ -125,59 +125,62 @@ defineExpose({ openModal, openForEdit });
 // -----------------------------------------------------------
 const handleFileUpload = (e) => {
   const file = e.target.files[0];
-  if (file) {
+  if (!file) return;
 
-    const img = new Image();
-    const reader = new FileReader();
+  const img = new Image();
+  const reader = new FileReader();
 
-    reader.onload = (ev) => {
-      img.src = ev.target.result;
-    };
+  reader.onload = (ev) => {
+    img.src = ev.target.result;
+  };
 
-    img.onload = () => {
-      const MAX_WIDTH = 8000;
-      const MAX_HEIGHT = 4000;
+  img.onload = () => {
+    const TARGET_WIDTH = 8000;
+    const TARGET_HEIGHT = 4000;
 
-      // 👉 BELOW LIMITS → EXACT ORIGINAL BEHAVIOR
-      if (img.width <= MAX_WIDTH && img.height <= MAX_HEIGHT) {
-        scene.value.panorama = file;
-        scene.value.previewUrl = URL.createObjectURL(file);
-        return;
-      }
+    // Always force exact size
+    const canvas = document.createElement("canvas");
+    canvas.width = TARGET_WIDTH;
+    canvas.height = TARGET_HEIGHT;
 
-      // 👉 ABOVE LIMITS → RESCALE
-      const scale = Math.min(
-        MAX_WIDTH / img.width,
-        MAX_HEIGHT / img.height
-      );
+    const ctx = canvas.getContext("2d");
 
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
+    // High-quality scaling
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
 
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(
+      img,
+      0,
+      0,
+      img.width,
+      img.height,
+      0,
+      0,
+      TARGET_WIDTH,
+      TARGET_HEIGHT
+    );
 
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) return;
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
 
-          const resizedFile = new File([blob], file.name, {
-            type: file.type || "image/jpeg",
-            lastModified: Date.now(),
-          });
+        const finalFile = new File([blob], file.name, {
+          type: file.type || "image/jpeg",
+          lastModified: Date.now(),
+        });
 
-          scene.value.panorama = resizedFile;
-          scene.value.previewUrl = URL.createObjectURL(blob);
-        },
-        file.type || "image/jpeg",
-        0.92
-      );
-    };
+        scene.value.panorama = finalFile;
+        scene.value.previewUrl = URL.createObjectURL(blob);
+      },
+      file.type || "image/jpeg",
+      0.95 // keep quality high for krpano
+    );
+  };
 
-    reader.readAsDataURL(file);
-  }
+  reader.readAsDataURL(file);
 };
+
 
 // -----------------------------------------------------------
 // Disable ALL DATA fields when selecting an existing scene
