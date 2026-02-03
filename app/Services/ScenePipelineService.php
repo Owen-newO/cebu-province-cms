@@ -2,50 +2,172 @@
 
 namespace App\Services;
 
+use App\Models\Scene;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use RecursiveIteratorIterator;
+use RecursiveDirectoryIterator;
 
-class SceneXmlService
+class ScenePipelineService
 {
     /* =====================================================
-     | CORE S3 HELPERS
+     |  PUBLIC ENTRY POINTS (CALLED BY CONTROLLER / JOB)
      ===================================================== */
-    private function tourXmlKey(string $municipalSlug): string
-    {
-        return "{$municipalSlug}/tour.xml";
-    }
 
-    private function load(string $municipalSlug): ?string
-    {
-        $key = $this->tourXmlKey($municipalSlug);
+    public function processNewScene(
+        Scene $scene,
+        string $localPanoramaPath,
+        string $municipalSlug,
+        array $validated
+    ): void {
+        $sceneId = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
+        $tempDir = dirname($localPanoramaPath);
+        $basePath = "{$municipalSlug}/{$sceneId}";
 
-        if (!Storage::disk('s3')->exists($key)) {
-            Log::error('❌ tour.xml missing', compact('municipalSlug'));
-            return null;
+        // 1️⃣ Run krpano
+        $this->runKrpano($localPanoramaPath);
+
+        // 2️⃣ Read local krpano tour.xml
+        $localTourXml = $tempDir . '/vtour/tour.xml';
+        $config = $this->extractKrpanoSceneConfig($sceneId, $localTourXml);
+
+        if ($config) {
+            $thumb   = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['thumb'], '/'));
+            $preview = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['preview'], '/'));
+            $cubeUrl = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['cube'], '/'));
+            $multires = $config['multires'];
+        } else {
+            $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
+            $thumb    = "{$tileBase}/thumb.jpg";
+            $preview  = "{$tileBase}/preview.jpg";
+            $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
+            $multires = '512,1024,2048';
         }
 
-        return Storage::disk('s3')->get($key);
+        // 3️⃣ Upload vtour folder
+        $this->uploadFolderToS3($tempDir . '/vtour', $basePath);
+
+        // 4️⃣ Inject scene + ALL layers
+        $this->appendSceneToXml(
+            $sceneId,
+            $validated,
+            $thumb,
+            $preview,
+            $cubeUrl,
+            $multires,
+            $municipalSlug
+        );
     }
 
-    private function save(string $municipalSlug, string $xml): void
+    public function updateSceneMeta(Scene $scene, array $validated): void
     {
-        Storage::disk('s3')->put($this->tourXmlKey($municipalSlug), $xml);
+        $sceneId = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
+        $municipalSlug = $scene->municipal;
+
+        $this->updateSceneMetaInXml($sceneId, $validated, $municipalSlug);
+        $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
+    }
+
+    public function deleteScene(Scene $scene): void
+    {
+        $sceneId = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
+        $municipalSlug = $scene->municipal;
+
+        $this->removeSceneFromXml($sceneId, $municipalSlug);
+        $this->removeLayerFromXml($sceneId, $municipalSlug);
+        $this->forceDeleteS3Directory("{$municipalSlug}/{$sceneId}");
     }
 
     /* =====================================================
-     | PUBLIC ENTRY POINT (USED BY JOB + CONTROLLER)
+     |  PRIVATE HELPERS (INTERNAL ONLY)
      ===================================================== */
-    public function injectFullScene(
-        int $sceneId,
-        array $validated,
-        string $thumb,
-        string $preview,
-        string $cubeUrl,
-        string $multires,
-        string $municipalSlug
-    ): void {
-        $this->appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug);
 
+    private function runKrpano(string $localPanorama): void
+    {
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
+        $exe = $isWindows
+            ? base_path('krpanotools/krpanotools.exe')
+            : base_path('krpanotools/krpanotools');
+
+        $config = base_path('krpanotools/templates/vtour-multires.config');
+
+        if ($isWindows) {
+            $exe = str_replace('/', '\\', $exe);
+            $config = str_replace('/', '\\', $config);
+            $localPanorama = str_replace('/', '\\', $localPanorama);
+        }
+
+        chdir(base_path());
+
+        $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
+
+        exec($cmd . " 2>&1", $out, $status);
+
+        if ($status !== 0) {
+            throw new \Exception("KRPANO failed: " . json_encode($out));
+        }
+    }
+
+    private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
+    {
+        if (!file_exists($tourXmlPath)) return null;
+
+        $xml = @simplexml_load_file($tourXmlPath);
+        if (!$xml) return null;
+
+        $target = 'scene_' . strtolower($sceneId);
+
+        foreach ($xml->scene as $scene) {
+            if (strtolower((string)$scene['name']) !== $target) continue;
+
+            return [
+                'thumb'    => (string)$scene['thumburl'],
+                'preview'  => (string)$scene->preview['url'],
+                'cube'     => (string)$scene->image->cube['url'],
+                'multires' => (string)$scene->image->cube['multires'],
+            ];
+        }
+
+        return null;
+    }
+
+    private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
+    {
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($localFolder, RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($files as $file) {
+            if ($file->isDir()) continue;
+
+            $key = $remoteFolder . '/' . substr($file->getPathname(), strlen($localFolder) + 1);
+            $key = str_replace('\\', '/', $key);
+
+            Storage::disk('s3')->put($key, file_get_contents($file->getPathname()));
+        }
+    }
+
+    /* ================= XML HELPERS ================= */
+
+    private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
+    {
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if (!$xml) return;
+
+        $sceneBlock = "
+<scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
+  <preview url=\"{$preview}\" />
+  <image>
+    <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
+  </image>
+</scene>
+";
+
+        $xml = str_replace('</krpano>', $sceneBlock . "\n</krpano>", $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
+
+        // ALL your existing layer injections
         $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
         $this->appendMapToSideMapLayerXml($validated['google_map_link'] ?? null, $validated['title'], $sceneId, $municipalSlug);
         $this->appendTitle($validated['title'], $sceneId, $municipalSlug);
@@ -60,146 +182,49 @@ class SceneXmlService
         $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug);
     }
 
-    /* =====================================================
-     | SCENE BLOCK
-     ===================================================== */
-    private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
+    /* ================= S3 XML LOAD/SAVE ================= */
+
+    private function loadTourXmlFromS3(string $municipalSlug): ?string
     {
-        $xml = $this->load($municipalSlug);
+        $key = "{$municipalSlug}/tour.xml";
+        return Storage::disk('s3')->exists($key)
+            ? Storage::disk('s3')->get($key)
+            : null;
+    }
+
+    private function saveTourXmlToS3(string $municipalSlug, string $xml): void
+    {
+        Storage::disk('s3')->put("{$municipalSlug}/tour.xml", $xml);
+    }
+
+    /* ================= DELETE HELPERS ================= */
+
+    private function removeSceneFromXml($sceneId, string $municipalSlug)
+    {
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
         if (!$xml) return;
 
-        $title    = htmlspecialchars($validated['title'], ENT_QUOTES);
-        $subtitle = htmlspecialchars($validated['location'] ?? '', ENT_QUOTES);
-
-        $scene = "
-<scene name=\"scene_{$sceneId}\" title=\"{$title}\" subtitle=\"{$subtitle}\" places=\"{$title}\" thumburl=\"{$thumb}\">
-  <view hlookat=\"0\" vlookat=\"0\" fov=\"120\" />
-  <preview url=\"{$preview}\" />
-  <image>
-    <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
-  </image>
-</scene>
-";
-
-        $xml = str_replace('</krpano>', $scene . "\n</krpano>", $xml);
-        $this->save($municipalSlug, $xml);
+        $xml = preg_replace('/<scene[^>]*scene_' . preg_quote($sceneId, '/') . '.*?<\/scene>/is', '', $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
     }
 
-    /* =====================================================
-     | LAYER HELPERS (UNCHANGED LOGIC)
-     ===================================================== */
-
-    private function injectUnder(string $parent, string $block, string $municipalSlug)
+    private function removeLayerFromXml($sceneId, string $municipalSlug)
     {
-        $xml = $this->load($municipalSlug);
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
         if (!$xml) return;
 
-        $pattern = '/(<layer[^>]*name="' . preg_quote($parent, '/') . '"[^>]*>)/i';
-        if (!preg_match($pattern, $xml)) return;
-
-        $xml = preg_replace($pattern, '$1' . "\n" . $block, $xml, 1);
-        $this->save($municipalSlug, $xml);
+        $xml = preg_replace('/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '".*?<\/layer>/is', '', $xml);
+        $this->saveTourXmlToS3($municipalSlug, $xml);
     }
 
-    private function appendLayerToXml($sceneId, $title, $barangay, $thumb, $municipalSlug)
+    private function forceDeleteS3Directory(string $prefix)
     {
-        $safe = htmlspecialchars($title, ENT_QUOTES);
-
-        $layer = "
-<layer name=\"{$safe}\" url=\"{$thumb}\" linkedscene=\"scene_{$sceneId}\" barangay=\"{$barangay}\" keep=\"true\" />
-";
-        $this->injectUnder('topni', $layer, $municipalSlug);
-    }
-
-    private function appendMapToSideMapLayerXml($map, $title, $sceneId, $municipalSlug)
-    {
-        if (!$map) return;
-
-        $layer = "
-<layer type=\"iframe\" iframeurl=\"{$map}\" linkedscene=\"scene_{$sceneId}\" />
-";
-        $this->injectUnder('sidemap', $layer, $municipalSlug);
-    }
-
-    private function appendTitle($title, $sceneId, $municipalSlug)
-    {
-        $title = htmlspecialchars($title, ENT_QUOTES);
-
-        $layer = "
-<layer type=\"text\" text=\"{$title}\" linkedscene=\"scene_{$sceneId}\" />
-";
-        $this->injectUnder('scrollarea6', $layer, $municipalSlug);
-    }
-
-    private function appendBarangayInsideForBarangay($barangay, $title, $sceneId, $municipalSlug)
-    {
-        if (!$barangay) return;
-
-        $layer = "
-<layer type=\"text\" text=\"{$barangay}\" linkedscene=\"scene_{$sceneId}\" />
-";
-        $this->injectUnder('forbarangay', $layer, $municipalSlug);
-    }
-
-    private function appendCategoryInsideForCat($category, $title, $sceneId, $municipalSlug)
-    {
-        if (!$category) return;
-
-        $layer = "
-<layer type=\"text\" text=\"{$category}\" linkedscene=\"scene_{$sceneId}\" />
-";
-        $this->injectUnder('forcat', $layer, $municipalSlug);
-    }
-
-    private function appenddetailsInsidescrollarea5($address, $title, $sceneId, $municipalSlug)
-    {
-        if (!$address) return;
-
-        $layer = "
-<layer type=\"text\" text=\"{$address}\" linkedscene=\"scene_{$sceneId}\" />
-";
-        $this->injectUnder('scrollarea5', $layer, $municipalSlug);
-    }
-
-    private function appendcontactnumber($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('forphone', "<layer type=\"text\" text=\"{$value}\" linkedscene=\"scene_{$sceneId}\" />", $municipalSlug);
-    }
-
-    private function appendemail($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('formail', "<layer type=\"text\" text=\"{$value}\" linkedscene=\"scene_{$sceneId}\" />", $municipalSlug);
-    }
-
-    private function appendwebsite($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('forwebsite', "<layer url=\"skin/browse.png\" linkedscene=\"scene_{$sceneId}\" onclick=\"openurl('{$value}')\" />", $municipalSlug);
-    }
-
-    private function appendfacebook($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('forfb', "<layer url=\"skin/fb.png\" linkedscene=\"scene_{$sceneId}\" onclick=\"openurl('{$value}')\" />", $municipalSlug);
-    }
-
-    private function appendinstagram($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('forinsta', "<layer url=\"skin/insta.png\" linkedscene=\"scene_{$sceneId}\" onclick=\"openurl('{$value}')\" />", $municipalSlug);
-    }
-
-    private function appendtiktok($value, $title, $sceneId, $municipalSlug)
-    {
-        if (!$value) return;
-
-        $this->injectUnder('fortiktok', "<layer url=\"skin/tiktok.png\" linkedscene=\"scene_{$sceneId}\" onclick=\"openurl('{$value}')\" />", $municipalSlug);
+        $files = Storage::disk('s3')->listContents($prefix, true);
+        foreach ($files as $file) {
+            if ($file['type'] === 'file') {
+                Storage::disk('s3')->delete($file['path']);
+            }
+        }
+        Storage::disk('s3')->deleteDirectory($prefix);
     }
 }
