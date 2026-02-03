@@ -118,22 +118,27 @@ class SceneController extends Controller
     $tempPanoramaPath = $tempDir . '/' . $filename;
     $file->move($tempDir, $filename);
 
-    // Upload original pano to S3
-    $originalKey = "{$basePath}/{$filename}";
-    Storage::disk('s3')->put($originalKey, file_get_contents($tempPanoramaPath));
+    // upload original to S3
+    Storage::disk('s3')->put(
+        "{$basePath}/{$filename}",
+        file_get_contents($tempPanoramaPath)
+    );
 
-    $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
+    $validated['panorama_path'] = Storage::disk('s3')->url("{$basePath}/{$filename}");
     $validated['status'] = 'pending';
+
+    // 🔥 VERY IMPORTANT
+    unset($validated['panorama']);
 
     $scene = Scene::create($validated);
 
-    // 🚀 QUEUE THE HEAVY WORK
-            ProcessSceneJob::dispatch(
-            $scene->id,
-            $tempPanoramaPath, 
-            $municipalSlug,
-            $validated
-        );
+    // 🚀 QUEUE ONLY PRIMITIVES
+    ProcessSceneJob::dispatch(
+        $scene->id,
+        $tempPanoramaPath,
+        $municipalSlug
+    );
+
 
     return redirect()
         ->route('Dashboard')

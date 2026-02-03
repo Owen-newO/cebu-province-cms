@@ -15,11 +15,10 @@ class ProcessSceneJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public int $sceneId,
-        public string $localPanoramaPath,
-        public string $municipalSlug,
-        public array $validated
-    ) {}
+    int $sceneId,
+    string $tempPanoramaPath,
+    string $municipalSlug
+) {}
 
         public function handle(ScenePipelineService $pipeline)
         {
