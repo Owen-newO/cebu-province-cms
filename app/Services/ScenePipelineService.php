@@ -44,20 +44,29 @@ class ScenePipelineService
         if (!file_exists($tourXmlPath)) {
             throw new \Exception('❌ KRPANO did not generate tour.xml');
         }
-        
-       
-        /* ================= 2️⃣ UPLOAD VT0UR TO S3 ================= */
+    
+        /* ================= 2️⃣ READ KRPANO CONFIG ================= */
+
+        $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
+
+        if ($config) {
+            $thumb    = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['thumb'], '/'));
+            $preview  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['preview'], '/'));
+            $cubeUrl  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['cube'], '/'));
+            $multires = $config['multires'];
+        } else {
+            Log::warning('⚠️ KRPANO config not found, using fallback URLs');
+
+            $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
+            $thumb    = "{$tileBase}/thumb.jpg";
+            $preview  = "{$tileBase}/preview.jpg";
+            $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
+            $multires = '512,1024,2048';
+        }
+
+        /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
         $this->uploadFolderToS3($vtourPath, $basePath);
-
-        /* ================= 3️⃣  READ KRPANO CONFIG ================= */
-
-        $config = $this->getStaticKrpanoConfig($basePath, $sceneId);
-
-        $thumb    = $config['thumb'];
-        $preview  = $config['preview'];
-        $cubeUrl  = $config['cube'];
-        $multires = $config['multires'];
 
         /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
 
@@ -75,7 +84,7 @@ class ScenePipelineService
             'scene_uid' => $sceneId,
         ]);
     }
-    
+
     public function updateSceneMeta(Scene $scene, array $validated): void
     {
         $sceneId = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
@@ -100,44 +109,48 @@ class ScenePipelineService
      ===================================================== */
 
     private function runKrpano(string $localPanorama): void
-{
-    $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    {
+        $exe = base_path('krpanotools/krpanotools');
+        $config = base_path('krpanotools/templates/vtour-multires.config');
 
-    $exe = $isWindows
-        ? base_path('krpanotools/krpanotools.exe')
-        : base_path('krpanotools/krpanotools');
+        chdir(base_path());
 
-    $config = base_path('krpanotools/templates/vtour-multires.config');
+        $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
 
-    // 🔑 CRITICAL: run krpano beside the panorama
-    chdir(dirname($localPanorama));
+        exec($cmd . " 2>&1", $out, $status);
 
-    $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
+        Log::info('🧩 KRPANO EXECUTED', [
+            'cmd' => $cmd,
+            'status' => $status,
+            'output' => $out,
+        ]);
 
-    exec($cmd . " 2>&1", $out, $status);
-
-    Log::info('🧩 KRPANO EXECUTION', [
-        'cmd'    => $cmd,
-        'cwd'    => getcwd(),
-        'status' => $status,
-        'output' => $out,
-    ]);
-
-    if ($status !== 0) {
-        throw new \Exception("❌ KRPANO failed: " . json_encode($out));
+        if ($status !== 0) {
+            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
+        }
     }
-}
-private function getStaticKrpanoConfig(string $basePath, string $sceneId): array
-{
-    $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
 
-    return [
-        'thumb'    => "{$tileBase}/thumb.jpg",
-        'preview'  => "{$tileBase}/preview.jpg",
-        'cube'     => "{$tileBase}/%s/l%l/%0v/l%l_%s_%0v_%0h.jpg",
-        'multires' => '512,640,1152,2304,4736',
-    ];
-}
+    private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
+    {
+        $xml = @simplexml_load_file($tourXmlPath);
+        if (!$xml) return null;
+
+        $target = 'scene_' . strtolower($sceneId);
+
+        foreach ($xml->scene as $scene) {
+            if (strtolower((string)$scene['name']) !== $target) continue;
+
+            return [
+                'thumb'    => (string)$scene['thumburl'],
+                'preview'  => (string)$scene->preview['url'],
+                'cube'     => (string)$scene->image->cube['url'],
+                'multires' => (string)$scene->image->cube['multires'],
+            ];
+        }
+
+        return null;
+    }
+
     private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
     {
         Log::info('⬆️ Uploading vtour to S3', [
