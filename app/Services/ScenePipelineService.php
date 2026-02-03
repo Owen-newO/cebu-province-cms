@@ -11,7 +11,7 @@ use RecursiveDirectoryIterator;
 class ScenePipelineService
 {
     /* =====================================================
-     |  PUBLIC ENTRY POINTS (CALLED BY CONTROLLER / JOB)
+     |  PUBLIC ENTRY POINTS
      ===================================================== */
 
     public function processNewScene(
@@ -20,23 +20,43 @@ class ScenePipelineService
         string $municipalSlug,
         array $validated
     ): void {
-        $sceneId = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
+        $sceneId  = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
         $tempDir = dirname($localPanoramaPath);
         $basePath = "{$municipalSlug}/{$sceneId}";
 
-        // 1️⃣ Run krpano
+        Log::info('🚀 Scene pipeline started', [
+            'scene_id' => $scene->id,
+            'scene_uid' => $sceneId,
+            'local_pano' => $localPanoramaPath,
+        ]);
+
+        /* ================= 1️⃣ RUN KRPANO ================= */
+
         $this->runKrpano($localPanoramaPath);
 
-        // 2️⃣ Read local krpano tour.xml
-        $localTourXml = $tempDir . '/vtour/tour.xml';
-        $config = $this->extractKrpanoSceneConfig($sceneId, $localTourXml);
+        $vtourPath = $tempDir . '/vtour';
+        $tourXmlPath = $vtourPath . '/tour.xml';
+
+        if (!is_dir($vtourPath)) {
+            throw new \Exception('❌ KRPANO did not generate vtour directory');
+        }
+
+        if (!file_exists($tourXmlPath)) {
+            throw new \Exception('❌ KRPANO did not generate tour.xml');
+        }
+
+        /* ================= 2️⃣ READ KRPANO CONFIG ================= */
+
+        $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
 
         if ($config) {
-            $thumb   = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['thumb'], '/'));
-            $preview = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['preview'], '/'));
-            $cubeUrl = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['cube'], '/'));
+            $thumb    = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['thumb'], '/'));
+            $preview  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['preview'], '/'));
+            $cubeUrl  = Storage::disk('s3')->url("{$basePath}/" . ltrim($config['cube'], '/'));
             $multires = $config['multires'];
         } else {
+            Log::warning('⚠️ KRPANO config not found, using fallback URLs');
+
             $tileBase = Storage::disk('s3')->url("{$basePath}/panos/{$sceneId}.tiles");
             $thumb    = "{$tileBase}/thumb.jpg";
             $preview  = "{$tileBase}/preview.jpg";
@@ -44,10 +64,12 @@ class ScenePipelineService
             $multires = '512,1024,2048';
         }
 
-        // 3️⃣ Upload vtour folder
-        $this->uploadFolderToS3($tempDir . '/vtour', $basePath);
+        /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
-        // 4️⃣ Inject scene + ALL layers
+        $this->uploadFolderToS3($vtourPath, $basePath);
+
+        /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
+
         $this->appendSceneToXml(
             $sceneId,
             $validated,
@@ -57,6 +79,10 @@ class ScenePipelineService
             $multires,
             $municipalSlug
         );
+
+        Log::info('✅ Scene pipeline finished', [
+            'scene_uid' => $sceneId,
+        ]);
     }
 
     public function updateSceneMeta(Scene $scene, array $validated): void
@@ -79,24 +105,13 @@ class ScenePipelineService
     }
 
     /* =====================================================
-     |  PRIVATE HELPERS (INTERNAL ONLY)
+     |  PRIVATE HELPERS
      ===================================================== */
 
     private function runKrpano(string $localPanorama): void
     {
-        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
-
-        $exe = $isWindows
-            ? base_path('krpanotools/krpanotools.exe')
-            : base_path('krpanotools/krpanotools');
-
+        $exe = base_path('krpanotools/krpanotools');
         $config = base_path('krpanotools/templates/vtour-multires.config');
-
-        if ($isWindows) {
-            $exe = str_replace('/', '\\', $exe);
-            $config = str_replace('/', '\\', $config);
-            $localPanorama = str_replace('/', '\\', $localPanorama);
-        }
 
         chdir(base_path());
 
@@ -104,15 +119,19 @@ class ScenePipelineService
 
         exec($cmd . " 2>&1", $out, $status);
 
+        Log::info('🧩 KRPANO EXECUTED', [
+            'cmd' => $cmd,
+            'status' => $status,
+            'output' => $out,
+        ]);
+
         if ($status !== 0) {
-            throw new \Exception("KRPANO failed: " . json_encode($out));
+            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
         }
     }
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
     {
-        if (!file_exists($tourXmlPath)) return null;
-
         $xml = @simplexml_load_file($tourXmlPath);
         if (!$xml) return null;
 
@@ -134,6 +153,11 @@ class ScenePipelineService
 
     private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
     {
+        Log::info('⬆️ Uploading vtour to S3', [
+            'local' => $localFolder,
+            'remote' => $remoteFolder,
+        ]);
+
         $files = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($localFolder, RecursiveDirectoryIterator::SKIP_DOTS)
         );
@@ -150,10 +174,19 @@ class ScenePipelineService
 
     /* ================= XML HELPERS ================= */
 
-    private function appendSceneToXml($sceneId, $validated, $thumb, $preview, $cubeUrl, $multires, $municipalSlug)
-    {
+    private function appendSceneToXml(
+        $sceneId,
+        $validated,
+        $thumb,
+        $preview,
+        $cubeUrl,
+        $multires,
+        $municipalSlug
+    ) {
         $xml = $this->loadTourXmlFromS3($municipalSlug);
-        if (!$xml) return;
+        if (!$xml) {
+            throw new \Exception('❌ Main tour.xml missing in S3');
+        }
 
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
@@ -167,7 +200,7 @@ class ScenePipelineService
         $xml = str_replace('</krpano>', $sceneBlock . "\n</krpano>", $xml);
         $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        // ALL your existing layer injections
+        // 🔥 YOUR EXISTING LAYER INJECTIONS
         $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
         $this->appendMapToSideMapLayerXml($validated['google_map_link'] ?? null, $validated['title'], $sceneId, $municipalSlug);
         $this->appendTitle($validated['title'], $sceneId, $municipalSlug);
