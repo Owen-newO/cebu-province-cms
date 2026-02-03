@@ -120,7 +120,7 @@ class SceneController extends Controller
 
     // Upload original pano to S3
     $originalKey = "{$basePath}/{$filename}";
-    Storage::disk('s3')->put($originalKey, file_get_contents($tempPanorama));
+    Storage::disk('s3')->put($originalKey, file_get_contents($tempPanoramaPath));
 
     $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
     $validated['status'] = 'pending';
