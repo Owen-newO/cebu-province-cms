@@ -5,21 +5,6 @@ import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed , watch } from "vue";
 
-const btn = {
-  fontSize: "20px",
-  padding: "10px 20px",
-  textAlign: "left",
-  background: "none",
-  border: "none",
-  color: "white",
-  cursor: "pointer",
-  borderRadius: "6px",
-};
-
-const activeBtn = {
-  ...btn,
-  backgroundColor: "#1e293b",
-};
 
 const toast = ref(null);
 const addOptimisticScene = (title) => {
