@@ -21,20 +21,19 @@ class ProcessSceneJob implements ShouldQueue
         public array $validated
     ) {}
 
-    public function handle(ScenePipelineService $service): void
-    {
-        $scene = Scene::findOrFail($this->sceneId);
+        public function handle(ScenePipelineService $pipeline)
+        {
+            $scene = Scene::findOrFail($this->sceneId);
 
-        // optional status tracking
-        $scene->update(['status' => 'processing']);
+            $scene->update(['status' => 'processing']);
 
-        $service->processNewScene(
-            $scene,
-            $this->localPanoramaPath,
-            $this->municipalSlug,
-            $this->validated
-        );
+            $pipeline->processNewScene(
+                $scene,
+                $this->localPanoramaPath,
+                $this->municipalSlug,
+                $this->validated
+            );
 
-        $scene->update(['status' => 'ready']);
-    }
+            $scene->update(['status' => 'done']);
+        }
 }

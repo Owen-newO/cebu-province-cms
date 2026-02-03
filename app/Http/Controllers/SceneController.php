@@ -115,7 +115,7 @@ class SceneController extends Controller
         mkdir($tempDir, 0775, true);
     }
 
-    $tempPanorama = $tempDir . DIRECTORY_SEPARATOR . $filename;
+    $tempPanoramaPath = $tempDir . '/' . $filename;
     $file->move($tempDir, $filename);
 
     // Upload original pano to S3
@@ -128,12 +128,12 @@ class SceneController extends Controller
     $scene = Scene::create($validated);
 
     // 🚀 QUEUE THE HEAVY WORK
-    ProcessSceneJob::dispatch(
-        $scene->id,
-        $tempPanorama,
-        $municipalSlug,
-        $validated
-    );
+            ProcessSceneJob::dispatch(
+            $scene->id,
+            $tempPanoramaPath, 
+            $municipalSlug,
+            $validated
+        );
 
     return redirect()
         ->route('Dashboard')
