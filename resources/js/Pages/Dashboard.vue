@@ -5,7 +5,22 @@ import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed , watch } from "vue";
 
-watch(showModal, v => console.log("Modal visible:", v));
+const btn = {
+  fontSize: "20px",
+  padding: "10px 20px",
+  textAlign: "left",
+  background: "none",
+  border: "none",
+  color: "white",
+  cursor: "pointer",
+  borderRadius: "6px",
+};
+
+const activeBtn = {
+  ...btn,
+  backgroundColor: "#1e293b",
+};
+
 const toast = ref(null);
 const addOptimisticScene = (title) => {
   scenes.value.unshift({
@@ -39,7 +54,7 @@ const activeGroupCount = ref(0);
 const showModal = ref(true);
 
 const sceneModal = ref(null);
-
+watch(showModal, v => console.log("Modal visible:", v));
 
 const filteredScenes = computed(() => {
   return scenes.value.filter((scene) => {
@@ -224,7 +239,23 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 
 <template>
   <Head title="Cebu CMS" />
-
+<div
+                  v-if="toast"
+                  style="
+                    position:fixed;
+                    bottom:30px;
+                    right:30px;
+                    background:#111827;
+                    color:white;
+                    padding:14px 20px;
+                    border-radius:12px;
+                    font-size:14px;
+                    z-index:9999;
+                    box-shadow:0 10px 25px rgba(0,0,0,.25);
+                  "
+                >
+                  ⏳ {{ toast }}
+                </div>
   <div
     style="display:flex; height:100vh; background:#f5f6fa; font-family:'Inter', sans-serif; color:#222;"
   >
@@ -561,23 +592,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                   />
                   View
                 </button>
-                <div
-    v-if="toast"
-    style="
-      position:fixed;
-      bottom:30px;
-      right:30px;
-      background:#111827;
-      color:white;
-      padding:14px 20px;
-      border-radius:12px;
-      font-size:14px;
-      z-index:9999;
-      box-shadow:0 10px 25px rgba(0,0,0,.25);
-    "
-  >
-    ⏳ {{ toast }}
-  </div>
+                
               </template>
 
               <!-- Single Scene Buttons -->
@@ -735,23 +750,6 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
   </div>
 </template>
 
-<script>
-const btn = {
-  fontSize: "20px",
-  padding: "10px 20px",
-  textAlign: "left",
-  background: "none",
-  border: "none",
-  color: "white",
-  cursor: "pointer",
-  borderRadius: "6px",
-};
-
-const activeBtn = {
-  ...btn,
-  backgroundColor: "#1e293b",
-};
-</script>
 
 <style scoped>
 ::-webkit-scrollbar {
