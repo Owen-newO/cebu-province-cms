@@ -29,23 +29,14 @@ class ScenePipelineService
             $path
         );
     }
-    private function normalizeExistingScenePaths(string $municipalSlug): void
-    {
-        $xml = $this->loadTourXmlFromS3($municipalSlug);
-        if (!$xml) return;
+    private function makePathRelative(string $path): string
+        {
+            $path = ltrim($path, '/');
 
-        $xml = preg_replace(
-            '#\b' . preg_quote($municipalSlug, '#') . '/+#',
-            '',
-            $xml
-        );
+            // remove first folder always
+            return preg_replace('#^[^/]+/#', '', $path);
+        }
 
-        $this->saveTourXmlToS3($municipalSlug, $xml);
-
-        Log::info('🔥 Normalized existing scene paths', [
-            'municipalSlug' => $municipalSlug,
-        ]);
-    }
     /* =====================================================
      |  ENTRY POINT
      ===================================================== */
@@ -224,9 +215,10 @@ class ScenePipelineService
         if (!$xml) {
             throw new \Exception('❌ Main tour.xml missing in S3');
         }
-        $thumb   = $this->stripMunicipal($thumb, $municipalSlug);
-        $preview = $this->stripMunicipal($preview, $municipalSlug);
-        $cubeUrl = $this->stripMunicipal($cubeUrl, $municipalSlug);
+        $thumb   = $this->makePathRelative($thumb);
+        $preview = $this->makePathRelative($preview);
+        $cubeUrl = $this->makePathRelative($cubeUrl);
+
 
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
