@@ -73,9 +73,9 @@ class ScenePipelineService
     // IMPORTANT: No municipal slug here.
     $tileBase = "{$sceneId}/panos/{$sceneId}.tiles";
 
-    $thumb    = "{$tileBase}/thumb.jpg";
-    $preview  = "{$tileBase}/preview.jpg";
-    $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
+    $thumb    = "{$tileBase}/panos/{$tileBase}/thumb.jpg";
+    $preview  = "{$tileBase}/panos/{$tileBase}/preview.jpg";
+    $cubeUrl  = "{$tileBase}/panos/{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
     $multires = "512,640,1280,2560";
 
     /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
