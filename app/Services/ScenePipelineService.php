@@ -64,31 +64,15 @@ class ScenePipelineService
 
         if ($config) {
             // ✅ ALWAYS STRIP MUNICIPAL
-            $thumb = $this->stripMunicipal(
-                "{$basePath}/" . ltrim($config['thumb'], '/'),
-                $municipalSlug
-            );
-
-            $preview = $this->stripMunicipal(
-                "{$basePath}/" . ltrim($config['preview'], '/'),
-                $municipalSlug
-            );
-
-            $cubeUrl = $this->stripMunicipal(
-                "{$basePath}/" . ltrim($config['cube'], '/'),
-                $municipalSlug
-            );
-
+            $thumb = $this->stripMunicipal($config['thumb'], $municipalSlug);
+            $preview = $this->stripMunicipal($config['preview'], $municipalSlug);
+            $cubeUrl = $this->stripMunicipal($config['cube'], $municipalSlug);
             $multires = $config['multires'];
         } else {
             // ✅ FALLBACK — ALSO STRIPPED
             Log::warning('⚠️ KRPANO config missing, using static fallback');
 
-            $tileBase = $this->stripMunicipal(
-                "{$basePath}/panos/{$sceneId}.tiles",
-                $municipalSlug
-            );
-
+            $tileBase = "panos/{$sceneId}.tiles";
             $thumb    = "{$tileBase}/thumb.jpg";
             $preview  = "{$tileBase}/preview.jpg";
             $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
