@@ -141,55 +141,32 @@ class ScenePipelineService
         ? base_path('krpanotools/krpanotools.exe')
         : base_path('krpanotools/krpanotools');
 
-    $config = base_path('krpanotools/templates/vtour-multires.config');
+    $config  = base_path('krpanotools/templates/vtour-multires.config');
+    $license = base_path('krpanotools/krpano.license');
+
+    if (!file_exists($license)) {
+        throw new \Exception('❌ krpano license file missing: ' . $license);
+    }
 
     if ($isWindows) {
         $exe           = str_replace('/', '\\', $exe);
         $config        = str_replace('/', '\\', $config);
+        $license       = str_replace('/', '\\', $license);
         $localPanorama = str_replace('/', '\\', $localPanorama);
     }
 
-    // 🔐 LICENSE
-    $licenseText = <<<LICENSE
-vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGAS
-DyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1O
-owESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkIN
-yTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N
-/hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2R
-y3sH4qOFjaehW7Y=
-LICENSE;
-
-    $licensePath = storage_path('app/krpano.license');
-
-    if (file_put_contents($licensePath, trim($licenseText)) === false) {
-        throw new \Exception('❌ Failed to write krpano license file');
-    }
-
-    chmod($licensePath, 0644);
-
-    if (!file_exists($licensePath)) {
-        throw new \Exception('❌ krpano license file missing AFTER write: ' . $licensePath);
-    }
-
-    Log::info('✅ krpano license written', [
-        'path' => $licensePath,
-        'size' => filesize($licensePath),
-    ]);
-
-    if ($isWindows) {
-        $licensePath = str_replace('/', '\\', $licensePath);
-    }
-
-    chdir(base_path());
+    // IMPORTANT: run beside the panorama
+    chdir(dirname($localPanorama));
 
     $cmd = "\"{$exe}\" makepano " .
            "-config=\"{$config}\" " .
-           "-license=\"{$licensePath}\" " .
+           "-license=\"{$license}\" " .
            "\"{$localPanorama}\"";
 
     exec($cmd . " 2>&1", $out, $status);
 
-    Log::info('🛠️ KRPANO executed', [
+    Log::info('🧩 KRPANO executed', [
+        'cmd'    => $cmd,
         'status' => $status,
         'output' => $out,
     ]);
@@ -197,11 +174,7 @@ LICENSE;
     if ($status !== 0) {
         throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
     }
-
-    @unlink($licensePath);
 }
-
-
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
