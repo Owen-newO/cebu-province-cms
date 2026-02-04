@@ -70,12 +70,9 @@ class ScenePipelineService
 
     /* ================= 2️⃣ STATIC PATH CONFIG ================= */
 
-    // IMPORTANT: No municipal slug here.
-    $tileBase = "{$sceneId}/panos/{$sceneId}.tiles";
-
-    $thumb    = "{$tileBase}/panos/{$tileBase}/thumb.jpg";
-    $preview  = "{$tileBase}/panos/{$tileBase}/preview.jpg";
-    $cubeUrl  = "{$tileBase}/panos/{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
+    $thumb    = "{$sceneId}/panos/{$sceneId}/thumb.jpg";
+    $preview  = "{$sceneId}/panos/{$sceneId}/preview.jpg";
+    $cubeUrl  = "{$sceneId}/panos/{$sceneId}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
     $multires = "512,640,1280,2560";
 
     /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
