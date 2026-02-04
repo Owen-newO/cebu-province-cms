@@ -96,9 +96,11 @@ class ScenePipelineService
             $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
             $multires = '512,1024,2048,4096';
         }
+             
         /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
         $this->uploadFolderToS3($vtourPath, $basePath);
+        $this->normalizeExistingScenePaths($municipalSlug);
 
         /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
 
