@@ -91,7 +91,6 @@ class ScenePipelineService
         /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
         $this->uploadFolderToS3($vtourPath, $basePath);
-        $this->normalizeExistingScenePaths($municipalSlug);
 
         /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
 
