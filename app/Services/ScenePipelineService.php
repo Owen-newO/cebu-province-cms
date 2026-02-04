@@ -42,72 +42,62 @@ class ScenePipelineService
      ===================================================== */
 
     public function processNewScene(
-        Scene $scene,
-        string $localPanoramaPath,
-        string $municipalSlug,
-        array $validated
-    ): void {
-        $sceneId   = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
-        $tempDir  = dirname($localPanoramaPath);
-        $basePath = "{$municipalSlug}/{$sceneId}";
+    Scene $scene,
+    string $localPanoramaPath,
+    string $municipalSlug,
+    array $validated
+): void {
 
-        Log::info('🚀 Scene pipeline started', [
-            'scene_id'  => $scene->id,
-            'scene_uid' => $sceneId,
-        ]);
+    $sceneId  = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
+    $tempDir  = dirname($localPanoramaPath);
+    $basePath = "{$municipalSlug}/{$sceneId}";
 
-        /* ================= 1️⃣ RUN KRPANO ================= */
+    Log::info('🚀 Scene pipeline started', [
+        'scene_id'  => $scene->id,
+        'scene_uid' => $sceneId,
+    ]);
 
-        $this->runKrpano($localPanoramaPath);
+    /* ================= 1️⃣ RUN KRPANO ================= */
 
-        $vtourPath   = $tempDir . '/vtour';
-        $tourXmlPath = $vtourPath . '/tour.xml';
+    $this->runKrpano($localPanoramaPath);
 
-        if (!is_dir($vtourPath) || !file_exists($tourXmlPath)) {
-            throw new \Exception('❌ KRPANO did not generate vtour/tour.xml');
-        }
+    $vtourPath   = $tempDir . '/vtour';
+    $tourXmlPath = $vtourPath . '/tour.xml';
 
-        /* ================= 2️⃣ READ KRPANO CONFIG ================= */
-
-        $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
-
-        if ($config) {
-            // ✅ ALWAYS STRIP MUNICIPAL
-            $thumb = $this->stripMunicipal($config['thumb'], $municipalSlug);
-            $preview = $this->stripMunicipal($config['preview'], $municipalSlug);
-            $cubeUrl = $this->stripMunicipal($config['cube'], $municipalSlug);  
-            $multires = $config['multires'];
-        } else {
-            // ✅ FALLBACK — ALSO STRIPPED
-            Log::warning('⚠️ KRPANO config missing, using static fallback');
-
-            $tileBase = "panos/{$sceneId}.tiles";
-            $thumb    = "{$tileBase}/thumb.jpg";
-            $preview  = "{$tileBase}/preview.jpg";
-            $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
-            $multires = '512,1024,2048,4096';
-        }
-             
-        /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
-
-        $this->uploadFolderToS3($vtourPath, $basePath);
-
-        /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
-
-        $this->appendSceneToXml(
-            $sceneId,
-            $validated,
-            $thumb,
-            $preview,
-            $cubeUrl,
-            $multires,
-            $municipalSlug
-        );
-
-        Log::info('✅ Scene pipeline finished', [
-            'scene_uid' => $sceneId,
-        ]);
+    if (!is_dir($vtourPath) || !file_exists($tourXmlPath)) {
+        throw new \Exception('❌ KRPANO did not generate vtour/tour.xml');
     }
+
+    /* ================= 2️⃣ STATIC PATH CONFIG ================= */
+
+    // IMPORTANT: No municipal slug here.
+    $tileBase = "{$sceneId}/panos/{$sceneId}.tiles";
+
+    $thumb    = "{$tileBase}/thumb.jpg";
+    $preview  = "{$tileBase}/preview.jpg";
+    $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
+    $multires = "512,640,1280,2560";
+
+    /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
+
+    $this->uploadFolderToS3($vtourPath, $basePath);
+
+    /* ================= 4️⃣ INJECT SCENE + LAYERS ================= */
+
+    $this->appendSceneToXml(
+        $sceneId,
+        $validated,
+        $thumb,
+        $preview,
+        $cubeUrl,
+        $multires,
+        $municipalSlug
+    );
+
+    Log::info('✅ Scene pipeline finished', [
+        'scene_uid' => $sceneId,
+    ]);
+}
 
     public function updateSceneMeta(Scene $scene, array $validated): void
     {
