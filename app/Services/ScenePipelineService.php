@@ -50,20 +50,18 @@ class ScenePipelineService
         $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
 
         if ($config) {
-            $thumb    = url("{$basePath}/" . ltrim($config['thumb'], '/'));
-            $preview  = url("{$basePath}/" . ltrim($config['preview'], '/'));
-            $cubeUrl  = url("{$basePath}/" . ltrim($config['cube'], '/'));
+            $thumb    = "{$basePath}/" . ltrim($config['thumb'], '/');
+            $preview  = "{$basePath}/" . ltrim($config['preview'], '/');
+            $cubeUrl  = "{$basePath}/" . ltrim($config['cube'], '/');
             $multires = $config['multires'];
         } else {
             Log::warning('⚠️ KRPANO config not found, using fallback URLs');
-
-            $tileBase = url("{$basePath}/panos/{$sceneId}.tiles");
+            $tileBase = "{$basePath}/panos/{$sceneId}.tiles";
             $thumb    = "{$tileBase}/thumb.jpg";
             $preview  = "{$tileBase}/preview.jpg";
-            $cubeUrl  = "{$tileBase}/%s/l%l/%0v_%0h.jpg";
+            $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
             $multires = '512,1024,2048';
         }
-
         /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
         $this->uploadFolderToS3($vtourPath, $basePath);
