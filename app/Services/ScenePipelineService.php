@@ -227,10 +227,6 @@ class ScenePipelineService
         $preview = ltrim($preview, '/');
         $cubeUrl = ltrim($cubeUrl, '/');
 
-        $thumb   = strstr($thumb, $sceneId);
-        $preview = strstr($preview, $sceneId);
-        $cubeUrl = strstr($cubeUrl, $sceneId);
-
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
   <preview url=\"{$preview}\" />
