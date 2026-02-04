@@ -20,13 +20,18 @@ class ScenePipelineService
      *  aloguinsan/scene123/panos/... → scene123/panos/...
      */
     private function stripMunicipal(string $path, string $municipalSlug): string
-    {
-        return preg_replace(
-            '#^' . preg_quote($municipalSlug, '#') . '/#',
-            '',
-            ltrim($path, '/')
-        );
+{
+    $path = ltrim($path, '/');
+
+    $prefix = $municipalSlug . '/';
+
+    // 🔥 Remove municipal slug repeatedly if present
+    while (str_starts_with($path, $prefix)) {
+        $path = substr($path, strlen($prefix));
     }
+
+    return $path;
+}
 
     /* =====================================================
      |  ENTRY POINT
@@ -204,6 +209,9 @@ class ScenePipelineService
         if (!$xml) {
             throw new \Exception('❌ Main tour.xml missing in S3');
         }
+        $thumb   = $this->stripMunicipal($thumb, $municipalSlug);
+        $preview = $this->stripMunicipal($preview, $municipalSlug);
+        $cubeUrl = $this->stripMunicipal($cubeUrl, $municipalSlug);
 
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
