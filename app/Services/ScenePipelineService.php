@@ -133,21 +133,26 @@ class ScenePipelineService
      |  PRIVATE HELPERS
      ===================================================== */
 
-    private function runKrpano(string $localPanorama): void
+  private function runKrpano(string $localPanorama): void
 {
-    $exe = base_path('krpanotools/krpanotools');
-    $config = base_path('krpanotools/templates/vtour-multires.config');
+    $exe     = base_path('krpanotools/krpanotools');
+    $config  = base_path('krpanotools/templates/vtour-multires.config');
+    $license = base_path('krpanotools/krpano.license'); // 👈 license
 
-    // ✅ run beside the panorama
+    if (!file_exists($license)) {
+        throw new \Exception('❌ krpano license file missing');
+    }
+
     chdir(dirname($localPanorama));
 
-    $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
+    $cmd = "\"{$exe}\" makepano " .
+           "-config=\"{$config}\" " .
+           "-license=\"{$license}\" " .
+           "\"{$localPanorama}\"";
 
     exec($cmd . " 2>&1", $out, $status);
 
     Log::info('🧩 KRPANO EXECUTED', [
-        'cmd'    => $cmd,
-        'cwd'    => getcwd(),
         'status' => $status,
         'output' => $out,
     ]);
@@ -156,6 +161,7 @@ class ScenePipelineService
         throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
     }
 }
+
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
