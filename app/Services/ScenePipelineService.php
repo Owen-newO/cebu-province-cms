@@ -215,10 +215,25 @@ class ScenePipelineService
         if (!$xml) {
             throw new \Exception('❌ Main tour.xml missing in S3');
         }
-        $thumb   = $this->makePathRelative($thumb);
-        $preview = $this->makePathRelative($preview);
-        $cubeUrl = $this->makePathRelative($cubeUrl);
+        $thumb   = ltrim($thumb, '/');
+        $preview = ltrim($preview, '/');
+        $cubeUrl = ltrim($cubeUrl, '/');
 
+        // remove slug if present
+        $thumb   = preg_replace('#^' . preg_quote($municipalSlug, '#') . '/#i', '', $thumb);
+        $preview = preg_replace('#^' . preg_quote($municipalSlug, '#') . '/#i', '', $preview);
+        $cubeUrl = preg_replace('#^' . preg_quote($municipalSlug, '#') . '/#i', '', $cubeUrl);
+
+        // force remove first folder if still exists
+        $thumb   = preg_replace('#^[^/]+/#', '', $thumb);
+        $preview = preg_replace('#^[^/]+/#', '', $preview);
+        $cubeUrl = preg_replace('#^[^/]+/#', '', $cubeUrl);
+
+        Log::info('CLEANED PATHS', [
+            'thumb' => $thumb,
+            'preview' => $preview,
+            'cube' => $cubeUrl
+        ]);
 
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
