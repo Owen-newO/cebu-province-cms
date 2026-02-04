@@ -9,20 +9,28 @@ use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
 class ScenePipelineService
-
 {
     /* =====================================================
-     |  PUBLIC ENTRY POINTS
+     |  UTIL
      ===================================================== */
 
-     private function stripMunicipal(string $path, string $municipalSlug): string
-{
-    return preg_replace(
-        '#^' . preg_quote($municipalSlug, '#') . '/#',
-        '',
-        ltrim($path, '/')
-    );
-}
+    /**
+     * Remove leading municipal slug from a path.
+     * Example:
+     *  aloguinsan/scene123/panos/... → scene123/panos/...
+     */
+    private function stripMunicipal(string $path, string $municipalSlug): string
+    {
+        return preg_replace(
+            '#^' . preg_quote($municipalSlug, '#') . '/#',
+            '',
+            ltrim($path, '/')
+        );
+    }
+
+    /* =====================================================
+     |  ENTRY POINT
+     ===================================================== */
 
     public function processNewScene(
         Scene $scene,
@@ -30,29 +38,24 @@ class ScenePipelineService
         string $municipalSlug,
         array $validated
     ): void {
-        $sceneId  = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
-        $tempDir = dirname($localPanoramaPath);
+        $sceneId   = pathinfo($localPanoramaPath, PATHINFO_FILENAME);
+        $tempDir  = dirname($localPanoramaPath);
         $basePath = "{$municipalSlug}/{$sceneId}";
 
         Log::info('🚀 Scene pipeline started', [
-            'scene_id' => $scene->id,
+            'scene_id'  => $scene->id,
             'scene_uid' => $sceneId,
-            'local_pano' => $localPanoramaPath,
         ]);
 
         /* ================= 1️⃣ RUN KRPANO ================= */
 
         $this->runKrpano($localPanoramaPath);
 
-        $vtourPath = $tempDir . '/vtour';
+        $vtourPath   = $tempDir . '/vtour';
         $tourXmlPath = $vtourPath . '/tour.xml';
 
-        if (!is_dir($vtourPath)) {
-            throw new \Exception('❌ KRPANO did not generate vtour directory');
-        }
-
-        if (!file_exists($tourXmlPath)) {
-            throw new \Exception('❌ KRPANO did not generate tour.xml');
+        if (!is_dir($vtourPath) || !file_exists($tourXmlPath)) {
+            throw new \Exception('❌ KRPANO did not generate vtour/tour.xml');
         }
 
         /* ================= 2️⃣ READ KRPANO CONFIG ================= */
@@ -60,6 +63,7 @@ class ScenePipelineService
         $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
 
         if ($config) {
+            // ✅ ALWAYS STRIP MUNICIPAL
             $thumb = $this->stripMunicipal(
                 "{$basePath}/" . ltrim($config['thumb'], '/'),
                 $municipalSlug
@@ -77,12 +81,18 @@ class ScenePipelineService
 
             $multires = $config['multires'];
         } else {
-            Log::warning('⚠️ KRPANO config not found, using fallback URLs');
-            $tileBase = "{$basePath}/panos/{$sceneId}.tiles";
+            // ✅ FALLBACK — ALSO STRIPPED
+            Log::warning('⚠️ KRPANO config missing, using static fallback');
+
+            $tileBase = $this->stripMunicipal(
+                "{$basePath}/panos/{$sceneId}.tiles",
+                $municipalSlug
+            );
+
             $thumb    = "{$tileBase}/thumb.jpg";
             $preview  = "{$tileBase}/preview.jpg";
             $cubeUrl  = "{$tileBase}/%s/l%l/%v/l%l_%s_%v_%h.jpg";
-            $multires = '512,1024,2048';
+            $multires = '512,1024,2048,4096';
         }
         /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
