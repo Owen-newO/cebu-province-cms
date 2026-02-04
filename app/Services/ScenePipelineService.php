@@ -149,8 +149,7 @@ class ScenePipelineService
         $localPanorama = str_replace('/', '\\', $localPanorama);
     }
 
-    /* ================= LICENSE (INSIDE FUNCTION) ================= */
-
+    // 🔐 LICENSE
     $licenseText = <<<LICENSE
 vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGAS
 DyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1O
@@ -161,14 +160,25 @@ y3sH4qOFjaehW7Y=
 LICENSE;
 
     $licensePath = storage_path('app/krpano.license');
-    file_put_contents($licensePath, trim($licenseText));
+
+    if (file_put_contents($licensePath, trim($licenseText)) === false) {
+        throw new \Exception('❌ Failed to write krpano license file');
+    }
+
     chmod($licensePath, 0644);
+
+    if (!file_exists($licensePath)) {
+        throw new \Exception('❌ krpano license file missing AFTER write: ' . $licensePath);
+    }
+
+    Log::info('✅ krpano license written', [
+        'path' => $licensePath,
+        'size' => filesize($licensePath),
+    ]);
 
     if ($isWindows) {
         $licensePath = str_replace('/', '\\', $licensePath);
     }
-
-    /* ================= RUN KRPANO ================= */
 
     chdir(base_path());
 
@@ -177,11 +187,9 @@ LICENSE;
            "-license=\"{$licensePath}\" " .
            "\"{$localPanorama}\"";
 
-    $out = [];
-    $status = 0;
     exec($cmd . " 2>&1", $out, $status);
 
-    Log::info('🛠️ KRPANO command executed', [
+    Log::info('🛠️ KRPANO executed', [
         'status' => $status,
         'output' => $out,
     ]);
