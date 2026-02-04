@@ -50,9 +50,21 @@ class ScenePipelineService
         $config = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
 
         if ($config) {
-            $thumb    = "{$basePath}/" . ltrim($config['thumb'], '/');
-            $preview  = "{$basePath}/" . ltrim($config['preview'], '/');
-            $cubeUrl  = "{$basePath}/" . ltrim($config['cube'], '/');
+            $thumb = $this->stripMunicipal(
+                "{$basePath}/" . ltrim($config['thumb'], '/'),
+                $municipalSlug
+            );
+
+            $preview = $this->stripMunicipal(
+                "{$basePath}/" . ltrim($config['preview'], '/'),
+                $municipalSlug
+            );
+
+            $cubeUrl = $this->stripMunicipal(
+                "{$basePath}/" . ltrim($config['cube'], '/'),
+                $municipalSlug
+            );
+
             $multires = $config['multires'];
         } else {
             Log::warning('⚠️ KRPANO config not found, using fallback URLs');
