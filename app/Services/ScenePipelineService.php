@@ -109,28 +109,28 @@ class ScenePipelineService
      ===================================================== */
 
     private function runKrpano(string $localPanorama): void
-    {
-        $exe = base_path('krpanotools/krpanotools');
-        $config = base_path('krpanotools/templates/vtour-multires.config');
+{
+    $exe = base_path('krpanotools/krpanotools');
+    $config = base_path('krpanotools/templates/vtour-multires.config');
 
-        // ✅ run beside the panorama
-        chdir(dirname($localPanorama));
+    // ✅ run beside the panorama
+    chdir(dirname($localPanorama));
 
-        $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
+    $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
 
-        exec($cmd . " 2>&1", $out, $status);
+    exec($cmd . " 2>&1", $out, $status);
 
-        Log::info('🧩 KRPANO EXECUTED', [
-            'cmd'    => $cmd,
-            'cwd'    => getcwd(),
-            'status' => $status,
-            'output' => $out,
-        ]);
+    Log::info('🧩 KRPANO EXECUTED', [
+        'cmd'    => $cmd,
+        'cwd'    => getcwd(),
+        'status' => $status,
+        'output' => $out,
+    ]);
 
-        if ($status !== 0) {
-            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
-        }
+    if ($status !== 0) {
+        throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
     }
+}
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
