@@ -9,10 +9,20 @@ use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 
 class ScenePipelineService
+
 {
     /* =====================================================
      |  PUBLIC ENTRY POINTS
      ===================================================== */
+
+     private function stripMunicipal(string $path, string $municipalSlug): string
+{
+    return preg_replace(
+        '#^' . preg_quote($municipalSlug, '#') . '/#',
+        '',
+        ltrim($path, '/')
+    );
+}
 
     public function processNewScene(
         Scene $scene,
