@@ -32,7 +32,23 @@ class ScenePipelineService
 
     return $path;
 }
+private function normalizeExistingScenePaths(string $municipalSlug): void
+{
+    $xml = $this->loadTourXmlFromS3($municipalSlug);
+    if (!$xml) return;
 
+    $xml = preg_replace(
+        '#\b' . preg_quote($municipalSlug, '#') . '/+#',
+        '',
+        $xml
+    );
+
+    $this->saveTourXmlToS3($municipalSlug, $xml);
+
+    Log::info('🔥 Normalized existing scene paths', [
+        'municipalSlug' => $municipalSlug,
+    ]);
+}
     /* =====================================================
      |  ENTRY POINT
      ===================================================== */
