@@ -20,35 +20,32 @@ class ScenePipelineService
      *  aloguinsan/scene123/panos/... → scene123/panos/...
      */
     private function stripMunicipal(string $path, string $municipalSlug): string
-{
-    $path = ltrim($path, '/');
+    {
+        $path = ltrim($path, '/');
 
-    $prefix = $municipalSlug . '/';
-
-    // 🔥 Remove municipal slug repeatedly if present
-    while (str_starts_with($path, $prefix)) {
-        $path = substr($path, strlen($prefix));
+        return preg_replace(
+            '#^' . preg_quote($municipalSlug, '#') . '/#i',
+            '',
+            $path
+        );
     }
+    private function normalizeExistingScenePaths(string $municipalSlug): void
+    {
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if (!$xml) return;
 
-    return $path;
-}
-private function normalizeExistingScenePaths(string $municipalSlug): void
-{
-    $xml = $this->loadTourXmlFromS3($municipalSlug);
-    if (!$xml) return;
+        $xml = preg_replace(
+            '#\b' . preg_quote($municipalSlug, '#') . '/+#',
+            '',
+            $xml
+        );
 
-    $xml = preg_replace(
-        '#\b' . preg_quote($municipalSlug, '#') . '/+#',
-        '',
-        $xml
-    );
+        $this->saveTourXmlToS3($municipalSlug, $xml);
 
-    $this->saveTourXmlToS3($municipalSlug, $xml);
-
-    Log::info('🔥 Normalized existing scene paths', [
-        'municipalSlug' => $municipalSlug,
-    ]);
-}
+        Log::info('🔥 Normalized existing scene paths', [
+            'municipalSlug' => $municipalSlug,
+        ]);
+    }
     /* =====================================================
      |  ENTRY POINT
      ===================================================== */
@@ -87,7 +84,7 @@ private function normalizeExistingScenePaths(string $municipalSlug): void
             // ✅ ALWAYS STRIP MUNICIPAL
             $thumb = $this->stripMunicipal($config['thumb'], $municipalSlug);
             $preview = $this->stripMunicipal($config['preview'], $municipalSlug);
-            $cubeUrl = $this->stripMunicipal($config['cube'], $municipalSlug);
+            $cubeUrl = $this->stripMunicipal($config['cube'], $municipalSlug);  
             $multires = $config['multires'];
         } else {
             // ✅ FALLBACK — ALSO STRIPPED
