@@ -227,7 +227,7 @@ class ScenePipelineService
         $cubeUrl = ltrim($cubeUrl, '/');
 
         $sceneBlock = "
-<scene name=\"scene_{$sceneId}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
+<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
