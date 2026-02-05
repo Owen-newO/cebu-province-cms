@@ -244,11 +244,13 @@ const submitScene = (isPublished) => {
 
   if (scene.value.panorama)
     formData.append("panorama", scene.value.panorama);
-
+  
+      closeModal();
+      
   router.post(route("scenes.store"), formData, {
     preserveScroll: true,
     onSuccess: () => {
-      closeModal();
+
       window.location.reload();
     },
   });
