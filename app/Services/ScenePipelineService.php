@@ -121,48 +121,47 @@ class ScenePipelineService
      |  PRIVATE HELPERS
      ===================================================== */
 
-            private function runKrpano($localPanorama)
-        {
-            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+        private function runKrpano($localPanorama)
+    {
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
-            $exe = $isWindows
-                ? base_path('krpanotools/krpanotools.exe')
-                : base_path('krpanotools/krpanotools');
+        $exe = $isWindows
+            ? base_path('krpanotools/krpanotools.exe')
+            : base_path('krpanotools/krpanotools');
 
-            $config  = base_path('krpanotools/templates/vtour-multires.config');
-            $license = base_path('krpanotools/krpano.license');
+        $config = base_path('krpanotools/templates/vtour-multires.config');
 
-            if (!file_exists($license)) {
-                throw new \Exception('❌ krpano license file missing: ' . $license);
-            }
-
-            if ($isWindows) {
-                $exe           = str_replace('/', '\\', $exe);
-                $config        = str_replace('/', '\\', $config);
-                $license       = str_replace('/', '\\', $license);
-                $localPanorama = str_replace('/', '\\', $localPanorama);
-            }
-
-            // run beside panorama
-            chdir(dirname($localPanorama));
-
-            $cmd = "\"{$exe}\" makepano " .
-                "-config=\"{$config}\" " .
-                "-license=\"{$license}\" " .
-                "\"{$localPanorama}\"";
-
-            exec($cmd . " 2>&1", $out, $status);
-
-            Log::info('🧩 KRPANO executed', [
-                'status' => $status,
-                'output' => $out,
-            ]);
-
-            if ($status !== 0) {
-                throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
-            }
+        if ($isWindows) {
+            $exe           = str_replace('/', '\\', $exe);
+            $config        = str_replace('/', '\\', $config);
+            $localPanorama = str_replace('/', '\\', $localPanorama);
         }
 
+        chdir(base_path());
+
+         $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  
+        -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGAS
+        DyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1O
+        owESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkIN
+        yTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N
+        /hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2R
+        y3sH4qOFjaehW7Y=\"";
+        
+
+        $out = [];
+        $status = 0;
+        exec($cmd . " 2>&1", $out, $status);
+
+        Log::info('🛠️ KRPANO command executed', [
+            'cmd'    => $cmd,
+            'status' => $status,
+            'output' => $out,
+        ]);
+
+        if ($status !== 0) {
+            throw new \Exception("KRPANO failed: " . json_encode($out));
+        }
+    }
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
