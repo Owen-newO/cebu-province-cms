@@ -150,17 +150,16 @@ class ScenePipelineService
 
         $out = [];
         $status = 0;
-        exec($cmd . " 2>&1", $out, $status);
+         exec($cmd . " 2>&1", $out, $status);
 
-        Log::info('🛠️ KRPANO command executed', [
-            'cmd'    => $cmd,
-            'status' => $status,
-            'output' => $out,
-        ]);
+            Log::info('🧩 KRPANO executed', [
+                'status' => $status,
+                'output' => $out,
+            ]);
 
-        if ($status !== 0) {
-            throw new \Exception("KRPANO failed: " . json_encode($out));
-        }
+            if ($status !== 0) {
+                throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
+            }
     }
 
 
