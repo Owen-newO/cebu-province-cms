@@ -142,7 +142,11 @@ class ScenePipelineService
     LICENSE;
 
         // 📄 Write license file dynamically
-        $licensePath = storage_path('app/krpano.license');
+        $licensePath = base_path('krpanotools/krpano.license');
+
+        if (!file_exists($licensePath)) {
+            throw new \Exception('❌ krpano license file missing: ' . $licensePath);
+        }
         file_put_contents($licensePath, $licenseString);
 
         if ($isWindows) {
