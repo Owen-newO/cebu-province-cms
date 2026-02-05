@@ -255,7 +255,7 @@ const submitScene = (isPublished) => {
 };
 
 const saveDraft = () => submitScene(false);
-const publishScene = () =>closeModal(); submitScene(true);
+const publishScene = () => submitScene(true);
 
 // -----------------------------------------------------------
 // Update Scene
