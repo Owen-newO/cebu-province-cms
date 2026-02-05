@@ -128,6 +128,8 @@ class ScenePipelineService
         $exe = $isWindows
             ? base_path('krpanotools/krpanotools.exe')
             : base_path('krpanotools/krpanotools');
+        $license = base_path('krpanotools/krpano.license');
+
 
         $config = base_path('krpanotools/templates/vtour-multires.config');
 
