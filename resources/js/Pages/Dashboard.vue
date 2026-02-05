@@ -24,7 +24,7 @@ const activeGroupCount = ref(0);
 const showModal = ref(true);
 
 const sceneModal = ref(null);
-
+const imageFailed = ref({});
 
 const filteredScenes = computed(() => {
   return scenes.value.filter((scene) => {
@@ -420,12 +420,44 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           >
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
-              <img
-                :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
-                loading="lazy"
-                alt=""
-                style="width: 100%; height: 180px; border-radius: 12px; object-fit: cover; margin-bottom: 12px;"
-              />
+              <div
+                  style="
+                    position:relative;
+                    width:100%;
+                    height:180px;
+                    border-radius:12px;
+                    overflow:hidden;
+                    margin-bottom:12px;
+                  "
+                >
+                  <img
+                    v-if="!imageFailed[scene.id]"
+                    :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
+                    loading="lazy"
+                    alt=""
+                    style="width:100%; height:100%; object-fit:cover;"
+                    @error="imageFailed[scene.id] = true"
+                  />
+
+                  <!-- GENERATING STATE -->
+                  <div
+                    v-else
+                    style="
+                      width:100%;
+                      height:100%;
+                      background:#f3f4f6;
+                      display:flex;
+                      align-items:center;
+                      justify-content:center;
+                      font-size:16px;
+                      font-weight:600;
+                      color:#6b7280;
+                      letter-spacing:0.4px;
+                    "
+                  >
+                    ⏳ Generating…
+                  </div>
+                </div>
               <div
                 v-if="scene.count > 1"
                 style="position:absolute; top:10px; right:10px; background:#facc15; color:#000; font-weight:600; font-size:13px; border-radius:20px; padding:4px 10px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,0.25);"
