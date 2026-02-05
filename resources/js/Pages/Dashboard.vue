@@ -25,6 +25,23 @@ const showModal = ref(true);
 
 const sceneModal = ref(null);
 const imageFailed = ref({});
+const imageCheckIntervals = {};
+
+const checkThumbnailReady = (sceneId, src) => {
+  if (imageCheckIntervals[sceneId]) return;
+
+  imageCheckIntervals[sceneId] = setInterval(() => {
+    const img = new Image();
+    img.src = src + "?t=" + Date.now(); // bust cache
+
+    img.onload = () => {
+      imageFailed.value[sceneId] = false;
+      clearInterval(imageCheckIntervals[sceneId]);
+      delete imageCheckIntervals[sceneId];
+    };
+  }, 4000); // check every 4s
+};
+
 
 const filteredScenes = computed(() => {
   return scenes.value.filter((scene) => {
@@ -421,42 +438,46 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <div
-                  style="
-                    position:relative;
-                    width:100%;
-                    height:180px;
-                    border-radius:12px;
-                    overflow:hidden;
-                    margin-bottom:12px;
-                  "
-                >
-                  <img
-                    v-if="!imageFailed[scene.id]"
-                    :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
-                    loading="lazy"
-                    alt=""
-                    style="width:100%; height:100%; object-fit:cover;"
-                    @error="imageFailed[scene.id] = true"
-                  />
+              style="
+                position:relative;
+                width:100%;
+                height:180px;
+                border-radius:12px;
+                overflow:hidden;
+                margin-bottom:12px;
+              "
+            >
+              <img
+                v-if="!imageFailed[scene.id]"
+                :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
+                loading="lazy"
+                alt=""
+                style="width:100%; height:100%; object-fit:cover;"
+                @error="
+                  imageFailed[scene.id] = true;
+                  checkThumbnailReady(
+                    scene.id,
+                    getImageUrl(getThumbnail(scene.panorama_path || scene.img))
+                  );
+                "
+              />
 
-                  <!-- GENERATING STATE -->
-                  <div
-                    v-else
-                    style="
-                      width:100%;
-                      height:100%;
-                      background:#f3f4f6;
-                      display:flex;
-                      align-items:center;
-                      justify-content:center;
-                      font-size:16px;
-                      font-weight:600;
-                      color:#6b7280;
-                      letter-spacing:0.4px;
-                    "
-                  >
-                    ⏳ Generating…
-                  </div>
+              <div
+                v-else
+                style="
+                  width:100%;
+                  height:100%;
+                  background:#f3f4f6;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  font-size:16px;
+                  font-weight:600;
+                  color:#6b7280;
+                "
+              >
+                ⏳ Generating…
+              </div>
                 </div>
               <div
                 v-if="scene.count > 1"
