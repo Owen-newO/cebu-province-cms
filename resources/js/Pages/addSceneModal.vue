@@ -248,13 +248,14 @@ const submitScene = (isPublished) => {
   router.post(route("scenes.store"), formData, {
     preserveScroll: true,
     onSuccess: () => {
+      closeModal();
       window.location.reload();
     },
   });
 };
 
 const saveDraft = () => submitScene(false);
-const publishScene = () =>closeModal(); submitScene(true);
+const publishScene = () => submitScene(true);
 
 // -----------------------------------------------------------
 // Update Scene
