@@ -139,8 +139,7 @@ class ScenePipelineService
 
         chdir(base_path());
 
-         $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  
-        -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGASDyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1OowESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkINyTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N/hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2Ry3sH4qOFjaehW7Y=\"";
+         $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGASDyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1OowESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkINyTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N/hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2Ry3sH4qOFjaehW7Y=\"";
         
 
         $out = [];
