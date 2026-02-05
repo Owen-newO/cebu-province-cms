@@ -122,40 +122,40 @@ class ScenePipelineService
      ===================================================== */
 
     private function runKrpano($localPanorama)
-{
-    $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+    {
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
-    $exe = $isWindows
-        ? base_path('krpanotools/krpanotools.exe')
-        : base_path('krpanotools/krpanotools');
+        $exe = $isWindows
+            ? base_path('krpanotools/krpanotools.exe')
+            : base_path('krpanotools/krpanotools');
 
-    $config = base_path('krpanotools/templates/vtour-multires.config');
+        $config = base_path('krpanotools/templates/vtour-multires.config');
 
-    if ($isWindows) {
-        $exe           = str_replace('/', '\\', $exe);
-        $config        = str_replace('/', '\\', $config);
-        $localPanorama = str_replace('/', '\\', $localPanorama);
+        if ($isWindows) {
+            $exe           = str_replace('/', '\\', $exe);
+            $config        = str_replace('/', '\\', $config);
+            $localPanorama = str_replace('/', '\\', $localPanorama);
+        }
+
+        // run beside panorama (this is still correct)
+        chdir(dirname($localPanorama));
+
+        $cmd = "\"{$exe}\" makepano " .
+       "-config=\"{$config}\" " .
+       "\"{$localPanorama}\"";
+
+        exec($cmd . " 2>&1", $out, $status);
+
+        Log::info('🧩 KRPANO executed (registered)', [
+            'cmd'    => $cmd,
+            'status' => $status,
+            'output' => $out,
+        ]);
+
+        if ($status !== 0) {
+            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
+        }
     }
-
-    // run beside panorama (this is still correct)
-    chdir(dirname($localPanorama));
-
-    $cmd = "\"{$exe}\" makepano " .
-           "-config=\"{$config}\" " .
-           "\"{$localPanorama}\"";
-
-    exec($cmd . " 2>&1", $out, $status);
-
-    Log::info('🧩 KRPANO executed (registered)', [
-        'cmd'    => $cmd,
-        'status' => $status,
-        'output' => $out,
-    ]);
-
-    if ($status !== 0) {
-        throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
-    }
-}
 
 
 
