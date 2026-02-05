@@ -122,35 +122,46 @@ class ScenePipelineService
      ===================================================== */
 
     private function runKrpano($localPanorama)
-{
-    $exe = base_path('krpanotools/krpanotools');
-    $config = base_path('krpanotools/templates/vtour-multires.config');
+    {
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
 
-    // Force HOME for www-data
-    $env = 'HOME=/var/www';
+        $exe = $isWindows
+            ? base_path('krpanotools/krpanotools.exe')
+            : base_path('krpanotools/krpanotools');
 
-    // Always delete old vtour (critical)
-    $vtourPath = dirname($localPanorama) . '/vtour';
-    if (is_dir($vtourPath)) {
-        \Illuminate\Support\Facades\File::deleteDirectory($vtourPath);
+
+
+        $config = base_path('krpanotools/templates/vtour-multires.config');
+
+        if ($isWindows) {
+            $exe           = str_replace('/', '\\', $exe);
+            $config        = str_replace('/', '\\', $config);
+            $localPanorama = str_replace('/', '\\', $localPanorama);
+        }
+
+        $license = base_path('krpanotools/krpano.license');
+        
+        // run beside panorama (this is still correct)
+        chdir(dirname($localPanorama));
+
+        $cmd = "\"{$exe}\" makepano " .
+       "-config=\"{$config}\" " .
+       "-license=\"{$license}\" " .
+       "\"{$localPanorama}\"";
+
+        exec($cmd . " 2>&1", $out, $status);
+
+        Log::info('🧩 KRPANO executed (registered)', [
+            'cmd'    => $cmd,
+            'status' => $status,
+            'output' => $out,
+        ]);
+
+        if ($status !== 0) {
+            throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
+        }
     }
 
-    chdir(dirname($localPanorama));
-
-    $cmd = "{$env} \"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"";
-
-    exec($cmd . " 2>&1", $out, $status);
-
-    Log::info('KRPANO RUN', [
-        'cmd' => $cmd,
-        'status' => $status,
-        'output' => $out,
-    ]);
-
-    if ($status !== 0) {
-        throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
-    }
-}
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
