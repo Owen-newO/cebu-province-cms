@@ -347,7 +347,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 
           <addSceneModal
             v-if="showModal"
-            @close="showModal = true"
+            @close="showModal = false"
             @saveDraft="handleSaveDraft"
             @publishScene="handlePublishScene"
             :barangays="barangays"
