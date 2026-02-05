@@ -121,6 +121,48 @@ class ScenePipelineService
      |  PRIVATE HELPERS
      ===================================================== */
 
+            private function runKrpano($localPanorama)
+        {
+            $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
+            $exe = $isWindows
+                ? base_path('krpanotools/krpanotools.exe')
+                : base_path('krpanotools/krpanotools');
+
+            $config  = base_path('krpanotools/templates/vtour-multires.config');
+            $license = base_path('krpanotools/krpano.license');
+
+            if (!file_exists($license)) {
+                throw new \Exception('❌ krpano license file missing: ' . $license);
+            }
+
+            if ($isWindows) {
+                $exe           = str_replace('/', '\\', $exe);
+                $config        = str_replace('/', '\\', $config);
+                $license       = str_replace('/', '\\', $license);
+                $localPanorama = str_replace('/', '\\', $localPanorama);
+            }
+
+            // run beside panorama
+            chdir(dirname($localPanorama));
+
+            $cmd = "\"{$exe}\" makepano " .
+                "-config=\"{$config}\" " .
+                "-license=\"{$license}\" " .
+                "\"{$localPanorama}\"";
+
+            exec($cmd . " 2>&1", $out, $status);
+
+            Log::info('🧩 KRPANO executed', [
+                'status' => $status,
+                'output' => $out,
+            ]);
+
+            if ($status !== 0) {
+                throw new \Exception("KRPANO failed:\n" . implode("\n", $out));
+            }
+        }
+
 
 
     private function extractKrpanoSceneConfig(string $sceneId, string $tourXmlPath): ?array
