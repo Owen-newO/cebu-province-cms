@@ -135,6 +135,8 @@ class SceneController extends Controller
 
         $scene = Scene::create($validated);
 
+        $this->runKrpano($tempPanoramaPath);
+
         ProcessSceneJob::dispatch(
             $scene->id,
             $tempPanoramaPath,
