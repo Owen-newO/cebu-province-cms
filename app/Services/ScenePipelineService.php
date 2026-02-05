@@ -144,6 +144,7 @@ class ScenePipelineService
 
         $cmd = "\"{$exe}\" makepano " .
        "-config=\"{$config}\" " .
+       "-license=\"{$license}\" " .
        "\"{$localPanorama}\"";
 
         exec($cmd . " 2>&1", $out, $status);
