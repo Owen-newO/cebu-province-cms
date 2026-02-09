@@ -256,14 +256,6 @@ class SceneController extends Controller
         }
 
         chdir(base_path());
-
-         $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  
-        -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGAS
-        DyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1O
-        owESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkIN
-        yTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N
-        /hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2R
-        y3sH4qOFjaehW7Y=\"";
         
 
         $out = [];
