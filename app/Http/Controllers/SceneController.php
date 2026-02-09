@@ -1147,6 +1147,51 @@ class SceneController extends Controller
             'municipalSlug' => $municipalSlug,
         ]);
     }
+// -----------------------------------------------------------
+// UPDATE
+// -----------------------------------------------------------
+public function update(Request $request, $id)
+{
+    $scene = Scene::findOrFail($id);
+
+    // validate (note: updating = true)
+    $validated = $this->validateScene($request, true);
+
+    $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
+    $validated['contact_number']  = $request->contact_number;
+    $validated['email']           = $request->email;
+    $validated['website']         = $request->website;
+    $validated['facebook']        = $request->facebook;
+    $validated['instagram']       = $request->instagram;
+    $validated['tiktok']          = $request->tiktok;
+    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
+
+    $municipalSlug = $this->municipalSlug($scene->municipal);
+
+    // -------------------------------------------------------
+    // Update DB first
+    // -------------------------------------------------------
+    $scene->update($validated);
+
+    // -------------------------------------------------------
+    // Update XML metadata (NO re-tiling)
+    // -------------------------------------------------------
+    $this->updateSceneMetaInXml(
+        pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME),
+        $validated,
+        $municipalSlug
+    );
+
+    $this->updateLayerMetaInXml(
+        pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME),
+        $validated,
+        $municipalSlug
+    );
+
+    return redirect()
+        ->route('Dashboard')
+        ->with('success', 'Scene updated successfully.');
+}
 
     // =====================================================================
     // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3
@@ -1204,6 +1249,8 @@ class SceneController extends Controller
         Log::info("Updated layer meta for scene {$sceneId} (S3)", [
             'municipalSlug' => $municipalSlug,
         ]);
+
+
     }
 
     // =====================================================================
