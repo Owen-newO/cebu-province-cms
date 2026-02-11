@@ -30,7 +30,7 @@ const makeEmptyScene = () => ({
   title: "",
   location: "",
   barangay: "",
-  category: [], // ✅ array now
+  category: "",
   address: "",
   panorama: null,
   previewUrl: null,
@@ -203,9 +203,7 @@ watch(() => scene.value.existingScene, (val) => {
   // Autofill locked fields
   scene.value.title = data.title || "";
   scene.value.barangay = data.barangay || "";
-  scene.value.category = Array.isArray(data.category)
-  ? data.category
-  : (data.category ? [data.category] : []);
+  scene.value.category = data.category || "";
   scene.value.address = data.address || "";
   scene.value.google_map_link = data.google_map_link || "";
   scene.value.contact_number = data.contact_number || "";
@@ -233,9 +231,7 @@ const submitScene = (isPublished) => {
   formData.append("municipal", props.municipal);
   formData.append("location", scene.value.location);
   formData.append("barangay", scene.value.barangay);
-  scene.value.category.forEach((c, i) => {
-  formData.append(`category[${i}]`, c);
-  });
+  formData.append("category", scene.value.category);
   formData.append("address", scene.value.address);
   formData.append("google_map_link", scene.value.google_map_link);
   formData.append("contact_number", scene.value.contact_number);
@@ -276,9 +272,7 @@ const updateScene = () => {
   formData.append("municipal", props.municipal);
   formData.append("location", scene.value.location);
   formData.append("barangay", scene.value.barangay);
-  scene.value.category.forEach((c, i) => {
-  formData.append(`category[${i}]`, c);
-  });
+  formData.append("category", scene.value.category);
   formData.append("address", scene.value.address);
   formData.append("google_map_link", scene.value.google_map_link);
   formData.append("contact_number", scene.value.contact_number);
@@ -462,20 +456,20 @@ const updateScene = () => {
           <!-- CATEGORY -->
           <div>
             <label style="font-size:15px;font-weight:600;">Category</label>
-        <select
-          v-model="scene.category"
-          multiple
-          :disabled="isUsingExisting"
-          :style="
-            isUsingExisting
-              ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
-              : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
-          "
-        >
-          <option v-for="c in categories" :key="c" :value="c">
-            {{ c }}
-          </option>
-        </select>
+<select
+  v-model="scene.category"
+  :disabled="isUsingExisting"
+  :style="
+    isUsingExisting
+      ? 'width:100%;padding:12px;border-radius:10px;background:#f3f4f6;border:1px solid #d1d5db;cursor:not-allowed;font-size:15px;'
+      : 'width:100%;padding:12px;border-radius:10px;background:#EEEDED;border:1px solid #d1d5db;font-size:15px;'
+  "
+>
+
+
+              <option value="">Select Category</option>
+              <option v-for="c in categories" :key="c">{{ c }}</option>
+            </select>
             
           </div>
 
