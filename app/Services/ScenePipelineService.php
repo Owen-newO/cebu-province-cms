@@ -860,7 +860,7 @@ class ScenePipelineService
         Storage::disk('s3')->deleteDirectory($prefix);
     }
 
-    ppublic function setPublishedFlag(string $sceneId, string $municipalSlug, bool $published): void
+    public function setPublishedFlag(string $sceneId, string $municipalSlug, bool $published): void
 {
     $xml = $this->loadTourXmlFromS3($municipalSlug);
     if (!$xml) {
