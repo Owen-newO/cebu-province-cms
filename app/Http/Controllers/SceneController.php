@@ -101,7 +101,7 @@ class SceneController extends Controller
     $validated['facebook']        = $request->facebook;
     $validated['instagram']       = $request->instagram;
     $validated['tiktok']          = $request->tiktok;
-    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
+    $validated['is_published'] === "true" ? 1 : 0;
 
     $file = $request->file('panorama');
     $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
