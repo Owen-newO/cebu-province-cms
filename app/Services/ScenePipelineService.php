@@ -217,11 +217,12 @@ class ScenePipelineService
         $thumb   = ltrim($thumb, '/');
         $preview = ltrim($preview, '/');
         $cubeUrl = ltrim($cubeUrl, '/');
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
        
 
 
         $sceneBlock = "
-<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" published=\"{$validated['is_published']}\">
+<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\">
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
@@ -233,18 +234,18 @@ class ScenePipelineService
         $this->saveTourXmlToS3($municipalSlug, $xml);
 
         // 🔥 YOUR EXISTING LAYER INJECTIONS
-        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug,  $validated);
-        $this->appendMapToSideMapLayerXml($validated['google_map_link'] ?? null, $validated['title'], $sceneId, $municipalSlug);
-        $this->appendTitle($validated['title'], $sceneId, $municipalSlug);
-        $this->appendBarangayInsideForBarangay($validated['barangay'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendCategoryInsideForCat($validated['category'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appenddetailsInsidescrollarea5($validated['address'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendcontactnumber($validated['contact_number'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendemail($validated['email'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendwebsite($validated['website'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendfacebook($validated['facebook'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendinstagram($validated['instagram'] ?? '', $validated['title'], $sceneId, $municipalSlug);
-        $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug);
+        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug, $validated);
+        $this->appendMapToSideMapLayerXml($validated['google_map_link'] ?? null, $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendTitle($validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendBarangayInsideForBarangay($validated['barangay'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendCategoryInsideForCat($validated['category'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appenddetailsInsidescrollarea5($validated['address'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendcontactnumber($validated['contact_number'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendemail($validated['email'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendwebsite($validated['website'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendfacebook($validated['facebook'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendinstagram($validated['instagram'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
     }
 
     private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug, $validated)
@@ -302,6 +303,7 @@ class ScenePipelineService
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
         
         if ($xml === null) return;
 
@@ -350,6 +352,8 @@ class ScenePipelineService
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
@@ -385,6 +389,7 @@ class ScenePipelineService
 
         $replacement = $openingTag . "\n" . $titleLayer;
         $xml = str_replace($openingTag, $replacement, $xml);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $this->saveTourXmlToS3($municipalSlug, $xml);
 
@@ -400,6 +405,7 @@ class ScenePipelineService
 
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -446,6 +452,7 @@ class ScenePipelineService
 
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -492,6 +499,7 @@ class ScenePipelineService
 
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -538,6 +546,7 @@ class ScenePipelineService
 
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -587,6 +596,7 @@ class ScenePipelineService
 
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -636,6 +646,7 @@ class ScenePipelineService
 
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -682,6 +693,7 @@ class ScenePipelineService
 
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -728,6 +740,7 @@ class ScenePipelineService
 
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -774,6 +787,7 @@ class ScenePipelineService
 
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
+         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
