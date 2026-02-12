@@ -452,9 +452,11 @@ class SceneController extends Controller
 
         $title    = htmlspecialchars($validated['title'], ENT_QUOTES);
         $subtitle = htmlspecialchars($validated['location'], ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $newScene = "
-<scene name=\"scene_{$sceneId}\" title=\"{$title}\" subtitle=\"{$subtitle}\" onstart=\"filterLayersByPlace\" places=\"{$title}\" thumburl=\"{$thumb}\">
+<scene name=\"scene_{$sceneId}\" title=\"{$title}\" subtitle=\"{$subtitle}\" onstart=\"filterLayersByPlace\" places=\"{$title}\" thumburl=\"{$thumb}\" publish=\"{$publish}\">
   <view hlookat=\"0\" vlookat=\"0\" fovtype=\"MFOV\" fov=\"120\" maxpixelzoom=\"2.0\" fovmin=\"70\" fovmax=\"140\" limitview=\"auto\" />
   <preview url=\"{$preview}\" />
   <image>
@@ -566,13 +568,14 @@ class SceneController extends Controller
 
         $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $layer = "
 <layer name=\"{$safeTitle}\" 
     url=\"{$thumb}\" 
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
-    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 
+    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\" 
     barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\">
     <layer type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
@@ -616,6 +619,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
@@ -638,6 +642,7 @@ class SceneController extends Controller
         height=\"100%\"
         align=\"center\"
         parent=\"sidemap\"
+        publish=\"{$publish}\"
         keep=\"true\"
         places=\"{$title}\"
         linkedscene=\"scene_{$sceneId}\"
@@ -662,6 +667,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
@@ -682,6 +688,7 @@ class SceneController extends Controller
         text=\"{$title}\"
         width=\"90%\"
         height=\"auto\"
+        publish=\"{$publish}\"
         autoheight=\"true\"
         enabled=\"false\"
         align=\"centertop\"
@@ -711,6 +718,7 @@ class SceneController extends Controller
 
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -730,6 +738,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"100%\"
         parent=\"forbarangay\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         align=\"center\"
         bgcolor=\"0x000000\"
@@ -756,6 +765,7 @@ class SceneController extends Controller
 
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -776,6 +786,7 @@ class SceneController extends Controller
         height=\"100%\"
         parent=\"forcat\"
         enabled=\"false\"
+        publish=\"{$publish}\"
         align=\"center\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
@@ -801,6 +812,7 @@ class SceneController extends Controller
 
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -820,6 +832,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"auto\"
         parent=\"scrollarea5\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         align=\"centertop\"
         bgcolor=\"0x000000\"
@@ -846,6 +859,7 @@ class SceneController extends Controller
 
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -869,6 +883,7 @@ class SceneController extends Controller
         text=\"{$contact_number}\"
         width=\"100%\"
         height=\"100%\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         parent=\"forphone\"
         align=\"center\"
@@ -894,6 +909,8 @@ class SceneController extends Controller
 
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -918,6 +935,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"100%\"
         enabled=\"false\"
+        publish=\"{$publish}\"
         parent=\"formail\"
         align=\"center\"
         bgcolor=\"0x000000\"
@@ -942,6 +960,7 @@ class SceneController extends Controller
 
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -964,6 +983,7 @@ class SceneController extends Controller
         url=\"skin/browse.png\"
         width=\"prop\"
         height=\"100%\"
+        publish=\"{$publish}\"
         parent=\"forwebsite\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
@@ -987,6 +1007,7 @@ class SceneController extends Controller
 
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1010,6 +1031,7 @@ class SceneController extends Controller
         width=\"prop\"
         height=\"100%\"
         parent=\"forfb\"
+        publish=\"{$publish}\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -1032,6 +1054,7 @@ class SceneController extends Controller
 
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1056,6 +1079,7 @@ class SceneController extends Controller
         height=\"100%\"
         parent=\"forinsta\"
         enabled=\"true\"
+        publish=\"{$publish}\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
         linkedscene=\"scene_{$sceneId}\"
@@ -1077,6 +1101,7 @@ class SceneController extends Controller
 
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
+        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1099,6 +1124,7 @@ class SceneController extends Controller
         url=\"skin/tiktok.png\"
         width=\"prop\"
         height=\"100%\"
+        publish=\"{$publish}\"
         parent=\"fortiktok\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
