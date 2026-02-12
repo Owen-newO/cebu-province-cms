@@ -863,69 +863,65 @@ class ScenePipelineService
     public function setPublishedFlag(string $sceneId, string $municipalSlug, bool $published): void
 {
     $xml = $this->loadTourXmlFromS3($municipalSlug);
-    if (!$xml) {
-        throw new \Exception("tour.xml missing for {$municipalSlug}");
-    }
+    if (!$xml) throw new \Exception("tour.xml missing for {$municipalSlug}");
 
     $val     = $published ? 'true' : 'false';
     $visible = $published ? 'true' : 'false';
     $enabled = $published ? 'true' : 'false';
-    $alpha   = $published ? '1'    : '0';
+    $alpha   = $published ? '1' : '0';
 
-    // --------- SCENE TAG ---------
-    $xml = preg_replace_callback(
-        '/<scene\b([^>]*\bname="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i',
-        function ($m) use ($val) {
-            $tag = $m[0];
+    $scenePattern = '/<scene\b([^>]*\bname="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i';
+    $layerPattern = '/<layer\b([^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i';
 
-            if (stripos($tag, 'ispublished="') !== false) {
-                return preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
-            }
-            return rtrim($tag, '>') . ' ispublished="'.$val.'">';
-        },
-        $xml
-    );
+    preg_match_all($scenePattern, $xml, $m1);
+    preg_match_all($layerPattern, $xml, $m2);
 
-    // --------- LAYERS LINKED TO SCENE ---------
-    $xml = preg_replace_callback(
-        '/<layer\b([^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i',
-        function ($m) use ($val, $visible, $enabled, $alpha) {
-            $tag = $m[0];
+    Log::info('🔎 setPublishedFlag matches', [
+        'municipalSlug' => $municipalSlug,
+        'sceneId'       => $sceneId,
+        'scene_matches' => count($m1[0]),
+        'layer_matches' => count($m2[0]),
+        'published'     => $published,
+    ]);
 
-            // ispublished
-            if (stripos($tag, 'ispublished="') !== false) {
-                $tag = preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
-            } else {
-                $tag = rtrim($tag, '>') . ' ispublished="'.$val.'">';
-            }
+    // update scene tag
+    $xml = preg_replace_callback($scenePattern, function ($m) use ($val) {
+        $tag = $m[0];
+        if (stripos($tag, 'ispublished="') !== false) {
+            return preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
+        }
+        return rtrim($tag, '>') . ' ispublished="'.$val.'">';
+    }, $xml);
 
-            // visible
-            if (stripos($tag, 'visible="') !== false) {
-                $tag = preg_replace('/\bvisible="(true|false)"/i', 'visible="'.$visible.'"', $tag);
-            } else {
-                $tag = rtrim($tag, '>') . ' visible="'.$visible.'">';
-            }
+    // update linked layers
+    $xml = preg_replace_callback($layerPattern, function ($m) use ($val, $visible, $enabled, $alpha) {
+        $tag = $m[0];
 
-            // enabled
-            if (stripos($tag, 'enabled="') !== false) {
-                $tag = preg_replace('/\benabled="(true|false)"/i', 'enabled="'.$enabled.'"', $tag);
-            } else {
-                $tag = rtrim($tag, '>') . ' enabled="'.$enabled.'">';
-            }
+        // ispublished
+        if (stripos($tag, 'ispublished="') !== false) {
+            $tag = preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
+        } else {
+            $tag = rtrim($tag, '>') . ' ispublished="'.$val.'">';
+        }
 
-            // alpha
-            if (preg_match('/\balpha="[^"]*"/i', $tag)) {
-                $tag = preg_replace('/\balpha="[^"]*"/i', 'alpha="'.$alpha.'"', $tag);
-            } else {
-                $tag = rtrim($tag, '>') . ' alpha="'.$alpha.'">';
-            }
+        // visible/enabled/alpha
+        $tag = (stripos($tag, 'visible="') !== false)
+            ? preg_replace('/\bvisible="(true|false)"/i', 'visible="'.$visible.'"', $tag)
+            : rtrim($tag, '>') . ' visible="'.$visible.'">';
 
-            return $tag;
-        },
-        $xml
-    );
+        $tag = (stripos($tag, 'enabled="') !== false)
+            ? preg_replace('/\benabled="(true|false)"/i', 'enabled="'.$enabled.'"', $tag)
+            : rtrim($tag, '>') . ' enabled="'.$enabled.'">';
+
+        $tag = preg_match('/\balpha="[^"]*"/i', $tag)
+            ? preg_replace('/\balpha="[^"]*"/i', 'alpha="'.$alpha.'"', $tag)
+            : rtrim($tag, '>') . ' alpha="'.$alpha.'">';
+
+        return $tag;
+    }, $xml);
 
     $this->saveTourXmlToS3($municipalSlug, $xml);
 }
+
 
 }
