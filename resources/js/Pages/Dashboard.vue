@@ -627,11 +627,11 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             style="background:white; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px;"
           >
             <img
-              :src="getImageUrl(scene.draft_panorama_path || scene.img)"
-              loading="lazy"
-              alt=""
-              style="width: 100%; height: 180px; border-radius: 12px; object-fit: cover; margin-bottom: 12px;"
-            />
+                  :src="getImageUrl(scene.draft_panorama_path || scene.img)"
+                  loading="lazy"
+                  alt=""
+                  style="width:100%; height:180px; border-radius:12px; object-fit:cover; margin-bottom:12px;"
+                />
 
             <h2 style="font-size:18px; font-weight:600;">{{ scene.title }}</h2>
             <span
@@ -681,12 +681,12 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 Delete
               </button>
               <button
-                  @click="publishDraft(scene.id)"
-                  style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background: #2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
-                >
-                  <img src="/images/plane.png" style="width:15px; height:15px;" />
-                  Publish
-                </button>
+                @click="publishDraft(scene.id)"
+                style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background:#2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+              >
+                <img src="/images/plane.png" style="width:15px; height:15px;" />
+                Publish
+              </button>
             </div>
           </div>
         </div>
