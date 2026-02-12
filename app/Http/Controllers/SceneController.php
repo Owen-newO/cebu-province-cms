@@ -90,10 +90,9 @@ class SceneController extends Controller
     // -----------------------------------------------------------
     // STORE
     // -----------------------------------------------------------
-   public function store(Request $request)
+    public function store(Request $request)
 {
     $validated = $this->validateScene($request);
-
     $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
     $validated['contact_number']  = $request->contact_number;
     $validated['email']           = $request->email;
@@ -101,24 +100,16 @@ class SceneController extends Controller
     $validated['facebook']        = $request->facebook;
     $validated['instagram']       = $request->instagram;
     $validated['tiktok']          = $request->tiktok;
-
-    // normalize publish flag
-    $isPublished = ($validated['is_published'] === "true" || $validated['is_published'] === 1 || $validated['is_published'] === true);
-    $validated['is_published'] = $isPublished ? 1 : 0;
+    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
     $file = $request->file('panorama');
-    if (!$file) {
-        return redirect()->route('Dashboard')->with('error', 'No panorama uploaded.');
-    }
-
     $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
     $sceneId  = pathinfo($filename, PATHINFO_FILENAME);
 
     $municipalSlug = $this->municipalSlug($validated['municipal']);
-
-    // -------------------------------------------------------
-    // TEMP DIR (keep your current flow)
-    // -------------------------------------------------------
+    $basePath = "{$municipalSlug}/{$sceneId}";
+    $originalKey = "{$basePath}/{$filename}";
+    // TEMP DIR
     $tempDir = storage_path("app/tmp_scenes/{$sceneId}");
     if (!file_exists($tempDir)) {
         mkdir($tempDir, 0775, true);
@@ -127,66 +118,37 @@ class SceneController extends Controller
     $tempPanoramaPath = $tempDir . '/' . $filename;
     $file->move($tempDir, $filename);
 
-    // -------------------------------------------------------
-    // DRAFT: upload original only, no krpano job
-    // -------------------------------------------------------
-    if (!$isPublished) {
-        // store in drafts path
-        $draftKey = "{$municipalSlug}/drafts/{$sceneId}/{$filename}";
-
-        Storage::disk('s3')->put(
-            $draftKey,
-            file_get_contents($tempPanoramaPath)
-        );
-
-        // set draft path (you need this column in DB)
-        $validated['draft_panorama_path'] = Storage::disk('s3')->url($draftKey);
-
-        // DO NOT set panorama_path for drafts (optional, but cleaner)
-        $validated['panorama_path'] = null;
-
-        $validated['status'] = 'draft';
-
-        // cleanup non-serializable
-        unset($validated['panorama'], $validated['panorama_file'], $validated['file']);
-
-        Scene::create($validated);
-
-        return redirect()
-            ->route('Dashboard')
-            ->with('success', 'Draft saved. No krpano tiling yet.');
-    }
-
-    // -------------------------------------------------------
-    // PUBLISH: your original behavior (upload + dispatch job)
-    // -------------------------------------------------------
-    $basePath    = "{$municipalSlug}/{$sceneId}";
-    $originalKey = "{$basePath}/{$filename}";
-
+    // upload original to S3
     Storage::disk('s3')->put(
         $originalKey,
         file_get_contents($tempPanoramaPath)
     );
 
-    $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
-    $validated['status'] = 'pending';
+    // after moving the file to tempDir
+        $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
+        $validated['status'] = 'pending';
 
-    unset($validated['panorama'], $validated['panorama_file'], $validated['file']);
+        // ❗ remove non-serializable stuff
+        unset($validated['panorama']);
+        unset($validated['panorama_file']);
+        unset($validated['file']);
 
-    $scene = Scene::create($validated);
+        $scene = Scene::create($validated);
 
-    ProcessSceneJob::dispatch(
-        $scene->id,
-        $tempPanoramaPath,
-        $municipalSlug,
-        $validated
-    );
+        ProcessSceneJob::dispatch(
+            $scene->id,
+            $tempPanoramaPath,
+            $municipalSlug,
+            $validated
+        );
+
+
+
 
     return redirect()
         ->route('Dashboard')
         ->with('success', 'Scene uploaded. Processing in background.');
 }
-
     // -----------------------------------------------------------
     // DESTROY
     // -----------------------------------------------------------

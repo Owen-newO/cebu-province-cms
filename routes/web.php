@@ -35,9 +35,6 @@ Route::post('/scenes', [SceneController::class, 'store'])->name('scenes.store');
 Route::match(['post', 'put'], '/scenes/{id}/update', [SceneController::class, 'update'])
     ->name('scenes.update');
 
-Route::post('/scenes/{scene}/publish', [SceneController::class, 'publish'])
-  ->name('scenes.publish');
-
 Route::delete('/scenes/{id}', [SceneController::class, 'destroy'])->name('scenes.destroy');
 
 // Auth routes
