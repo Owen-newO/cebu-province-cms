@@ -217,7 +217,7 @@ class ScenePipelineService
         $thumb   = ltrim($thumb, '/');
         $preview = ltrim($preview, '/');
         $cubeUrl = ltrim($cubeUrl, '/');
-         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
        
 
 
@@ -291,7 +291,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendMapToSideMapLayerXml($googleMapSrc, $title, $sceneId, $municipalSlug)
+    private function appendMapToSideMapLayerXml($googleMapSrc, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$googleMapSrc) {
             Log::info("ℹ️ No google_map_link provided — skipping sidemap iframe injection.", [
@@ -303,7 +303,7 @@ class ScenePipelineService
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
-         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
         
         if ($xml === null) return;
 
@@ -346,7 +346,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendTitle($title, $sceneId, $municipalSlug)
+    private function appendTitle($title, $sceneId, $municipalSlug, $validated)
     {
         if (!$title) return;
 
@@ -399,7 +399,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendBarangayInsideForBarangay($barangay, $title, $sceneId, $municipalSlug)
+    private function appendBarangayInsideForBarangay($barangay, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$barangay) return;
 
@@ -446,7 +446,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendCategoryInsideForCat($category, $title, $sceneId, $municipalSlug)
+    private function appendCategoryInsideForCat($category, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$category) return;
 
@@ -493,7 +493,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appenddetailsInsidescrollarea5($address, $title, $sceneId, $municipalSlug)
+    private function appenddetailsInsidescrollarea5($address, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$address) return;
 
@@ -540,7 +540,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendcontactnumber($contact_number, $title, $sceneId, $municipalSlug)
+    private function appendcontactnumber($contact_number, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$contact_number) return;
 
@@ -590,7 +590,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendemail($email, $title, $sceneId, $municipalSlug)
+    private function appendemail($email, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$email) return;
 
@@ -640,7 +640,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendwebsite($website, $title, $sceneId, $municipalSlug)
+    private function appendwebsite($website, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$website) return;
 
@@ -687,7 +687,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendfacebook($facebook, $title, $sceneId, $municipalSlug)
+    private function appendfacebook($facebook, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$facebook) return;
 
@@ -734,7 +734,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendinstagram($instagram, $title, $sceneId, $municipalSlug)
+    private function appendinstagram($instagram, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$instagram) return;
 
@@ -781,7 +781,7 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendtiktok($tiktok, $title, $sceneId, $municipalSlug)
+    private function appendtiktok($tiktok, $title, $sceneId, $municipalSlug, $validated)
     {
         if (!$tiktok) return;
 
