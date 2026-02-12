@@ -101,7 +101,7 @@ class SceneController extends Controller
     $validated['facebook']        = $request->facebook;
     $validated['instagram']       = $request->instagram;
     $validated['tiktok']          = $request->tiktok;
-    $validated['is_published'] === "true" ? 1 : 0;
+    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
 
     $file = $request->file('panorama');
     $filename = time() . '_' . str_replace(' ', '_', $file->getClientOriginalName());
@@ -452,7 +452,7 @@ class SceneController extends Controller
 
         $title    = htmlspecialchars($validated['title'], ENT_QUOTES);
         $subtitle = htmlspecialchars($validated['location'], ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+        $publish = htmlspecialchars($validated['is_published'], ENT_QUOTES);
 
 
         $newScene = "
@@ -1144,59 +1144,27 @@ class SceneController extends Controller
 
     public function publish(Scene $scene, ScenePipelineService $pipeline)
 {
-    // already published
     if ((int)$scene->is_published === 1) {
         return back()->with('info', 'Already published.');
     }
 
-    // sceneId must match what your pipeline used (filename without extension)
-    $sceneId = pathinfo($scene->panorama_path ?? '', PATHINFO_FILENAME);
+    $path = parse_url($scene->panorama_path ?? '', PHP_URL_PATH) ?: '';
+    $sceneId = pathinfo($path, PATHINFO_FILENAME);
 
     if (!$sceneId) {
         return back()->with('error', 'Missing panorama_path / sceneId.');
     }
 
-    // 1) update DB
+    $municipalSlug = $this->municipalSlug($scene->municipal);
+
     $scene->update(['is_published' => 1]);
 
-    // 2) update tour.xml ispublished="true"
-    $pipeline->setPublishedFlag($sceneId, $scene->municipal, true);
+    // ✅ use slug
+    $pipeline->setPublishedFlag($sceneId, $municipalSlug, true);
 
     return back()->with('success', 'Published. Scene is now visible.');
 }
 
-    // =====================================================================
-    // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL, S3
-    // =====================================================================
-    private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
-    {
-        $xml = $this->loadTourXmlFromS3($municipalSlug);
-        if ($xml === null) return;
-
-        $title    = $validated['title'] ?? '';
-        $subtitle = $validated['location'] ?? '';
-
-        $pattern = '/(<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(>)/is';
-
-        $replacement = function ($m) use ($title, $subtitle) {
-            $block = $m[1];
-
-            $block = preg_replace('/title="[^"]*"/', 'title="' . $title . '"', $block);
-            $block = preg_replace('/subtitle="[^"]*"/', 'subtitle="' . $subtitle . '"', $block);
-            $block = preg_replace('/places="[^"]*"/', 'places="' . $title . '"', $block);
-
-            return $block . $m[2];
-        };
-
-        $xml = preg_replace_callback($pattern, $replacement, $xml);
-
-        $this->saveTourXmlToS3($municipalSlug, $xml);
-
-        Log::info("✏️ Updated scene meta in XML (S3)", [
-            'sceneId'       => $sceneId,
-            'municipalSlug' => $municipalSlug,
-        ]);
-    }
 // -----------------------------------------------------------
 // UPDATE
 // -----------------------------------------------------------
