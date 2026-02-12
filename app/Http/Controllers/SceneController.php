@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 use App\Jobs\ProcessSceneJob;
+use App\Services\ScenePipelineService;
 
 class SceneController extends Controller
 {
@@ -332,67 +333,6 @@ class SceneController extends Controller
 
         return null;
     }
-public function publish(Scene $scene)
-{
-    // Already published? stop
-    if ((int)$scene->is_published === 1) {
-        return redirect()->route('Dashboard')->with('info', 'Already published.');
-    }
-
-    // You MUST have a draft pano saved for Option A
-    if (!$scene->draft_panorama_path) {
-        return redirect()->route('Dashboard')->with('error', 'Draft has no panorama to publish.');
-    }
-
-    $municipalSlug = $this->municipalSlug($scene->municipal);
-
-    // draft_panorama_path is likely a FULL URL right now in your store() changes
-    // Convert URL -> S3 key
-    $draftUrl = $scene->draft_panorama_path;
-    $draftKey = parse_url($draftUrl, PHP_URL_PATH);
-    $draftKey = ltrim($draftKey, '/');
-
-    // Extract filename + sceneId from draft key
-    $filename = basename($draftKey);
-    $sceneId  = pathinfo($filename, PATHINFO_FILENAME);
-
-    // This is the SAME publish path pattern you use in store():
-    $basePath    = "{$municipalSlug}/{$sceneId}";
-    $originalKey = "{$basePath}/{$filename}";
-
-    // Copy draft pano -> publish original key
-    Storage::disk('s3')->copy($draftKey, $originalKey);
-
-    // Download to temp path because your job expects local file path
-    $tempDir = storage_path("app/tmp_scenes/{$sceneId}");
-    if (!file_exists($tempDir)) {
-        mkdir($tempDir, 0775, true);
-    }
-
-    $tempPanoramaPath = $tempDir . '/' . $filename;
-    file_put_contents($tempPanoramaPath, Storage::disk('s3')->get($originalKey));
-
-    // Update scene row for published processing
-    $scene->update([
-        'is_published'  => 1,
-        'panorama_path' => Storage::disk('s3')->url($originalKey),
-        'status'        => 'pending',
-        'draft_panorama_path' => null, // optional cleanup
-    ]);
-
-    // Dispatch the same pipeline job
-    ProcessSceneJob::dispatch(
-        $scene->id,
-        $tempPanoramaPath,
-        $municipalSlug,
-        $validated
-    );
-
-    return redirect()
-        ->route('Dashboard')
-        ->with('success', 'Draft queued for publishing. Processing in background.');
-}
-
 
     // =====================================================================
     // UPLOAD FOLDER TO S3
@@ -1176,6 +1116,29 @@ public function publish(Scene $scene)
         ]);
     }
 
+    public function publish(Scene $scene, ScenePipelineService $pipeline)
+{
+    // already published
+    if ((int)$scene->is_published === 1) {
+        return back()->with('info', 'Already published.');
+    }
+
+    // sceneId must match what your pipeline used (filename without extension)
+    $sceneId = pathinfo($scene->panorama_path ?? '', PATHINFO_FILENAME);
+
+    if (!$sceneId) {
+        return back()->with('error', 'Missing panorama_path / sceneId.');
+    }
+
+    // 1) update DB
+    $scene->update(['is_published' => 1]);
+
+    // 2) update tour.xml ispublished="true"
+    $pipeline->setPublishedFlag($sceneId, $scene->municipal, true);
+
+    return back()->with('success', 'Published. Scene is now visible.');
+}
+
     // =====================================================================
     // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL, S3
     // =====================================================================
@@ -1253,6 +1216,7 @@ public function update(Request $request, $id)
         ->route('Dashboard')
         ->with('success', 'Scene updated successfully.');
 }
+
 
     // =====================================================================
     // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3

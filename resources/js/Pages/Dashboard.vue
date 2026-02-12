@@ -11,6 +11,13 @@ const props = defineProps({
   barangays: Array,
   municipal: String,
 });
+
+const publishDraft = (id) => {
+  router.post(route("scenes.publish", id), {}, {
+    preserveScroll: true,
+    onSuccess: () => window.location.reload(),
+  });
+};
 const activeBarangay = ref(null);
 const activeCategory = ref(null);
 const showBarangayDropdown = ref(false);
@@ -673,12 +680,10 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 Delete
               </button>
               <button
-                style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background: #2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                @click="publishDraft(scene.id)"
+                style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background:#2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
               >
-                <img
-                  src="/images/plane.png"
-                  style="width:15px; height:15px;"
-                />
+                <img src="/images/plane.png" style="width:15px; height:15px;" />
                 Publish
               </button>
             </div>

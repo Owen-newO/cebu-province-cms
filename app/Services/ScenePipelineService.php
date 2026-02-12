@@ -217,9 +217,11 @@ class ScenePipelineService
         $thumb   = ltrim($thumb, '/');
         $preview = ltrim($preview, '/');
         $cubeUrl = ltrim($cubeUrl, '/');
+        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+
 
         $sceneBlock = "
-<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\">
+<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\">
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
@@ -231,7 +233,7 @@ class ScenePipelineService
         $this->saveTourXmlToS3($municipalSlug, $xml);
 
         // 🔥 YOUR EXISTING LAYER INJECTIONS
-        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
+        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug,  $validated);
         $this->appendMapToSideMapLayerXml($validated['google_map_link'] ?? null, $validated['title'], $sceneId, $municipalSlug);
         $this->appendTitle($validated['title'], $sceneId, $municipalSlug);
         $this->appendBarangayInsideForBarangay($validated['barangay'] ?? '', $validated['title'], $sceneId, $municipalSlug);
@@ -245,13 +247,14 @@ class ScenePipelineService
         $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug);
     }
 
-     private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug)
+    private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug, $validated)
     {
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
         $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $layer = "
 <layer name=\"{$safeTitle}\" 
@@ -259,7 +262,7 @@ class ScenePipelineService
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
     keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 
-    barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\">
+    barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\" ispublished=\"{$isPublishedAttr}\">
     <layer type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
@@ -299,6 +302,7 @@ class ScenePipelineService
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+        
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
@@ -320,6 +324,7 @@ class ScenePipelineService
         width=\"100%\"
         height=\"100%\"
         align=\"center\"
+        ispublished=\"{$isPublishedAttr}\"
         parent=\"sidemap\"
         keep=\"true\"
         places=\"{$title}\"
@@ -367,6 +372,7 @@ class ScenePipelineService
         height=\"auto\"
         autoheight=\"true\"
         enabled=\"false\"
+        ispublished=\"{$isPublishedAttr}\"
         align=\"centertop\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
@@ -415,6 +421,7 @@ class ScenePipelineService
         parent=\"forbarangay\"
         enabled=\"false\"
         align=\"center\"
+        ispublished=\"{$isPublishedAttr}\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
         places=\"{$title}\"
@@ -461,6 +468,7 @@ class ScenePipelineService
         enabled=\"false\"
         align=\"center\"
         bgcolor=\"0x000000\"
+        ispublished=\"{$isPublishedAttr}\"
         bgalpha=\"0\"
         places=\"{$title}\"
         linkedscene=\"scene_{$sceneId}\"
@@ -506,6 +514,7 @@ class ScenePipelineService
         enabled=\"false\"
         align=\"centertop\"
         bgcolor=\"0x000000\"
+        ispublished=\"{$isPublishedAttr}\"
         bgalpha=\"0\"
         css=\"font-family:Chewy;color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -555,6 +564,7 @@ class ScenePipelineService
         enabled=\"false\"
         parent=\"forphone\"
         align=\"center\"
+        ispublished=\"{$isPublishedAttr}\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
@@ -603,6 +613,7 @@ class ScenePipelineService
         enabled=\"false\"
         parent=\"formail\"
         align=\"center\"
+        ispublished=\"{$isPublishedAttr}\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left; word-wrap:break-word; overflow-wrap:break-word; white-space:normal;\"
@@ -648,6 +659,7 @@ class ScenePipelineService
         width=\"prop\"
         height=\"100%\"
         parent=\"forwebsite\"
+        ispublished=\"{$isPublishedAttr}\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -692,6 +704,7 @@ class ScenePipelineService
         url=\"skin/fb.png\"
         width=\"prop\"
         height=\"100%\"
+        ispublished=\"{$isPublishedAttr}\"
         parent=\"forfb\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
@@ -738,6 +751,7 @@ class ScenePipelineService
         width=\"prop\"
         height=\"100%\"
         parent=\"forinsta\"
+        ispublished=\"{$isPublishedAttr}\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -783,6 +797,7 @@ class ScenePipelineService
         width=\"prop\"
         height=\"100%\"
         parent=\"fortiktok\"
+        ispublished=\"{$isPublishedAttr}\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -844,4 +859,73 @@ class ScenePipelineService
         }
         Storage::disk('s3')->deleteDirectory($prefix);
     }
+
+    ppublic function setPublishedFlag(string $sceneId, string $municipalSlug, bool $published): void
+{
+    $xml = $this->loadTourXmlFromS3($municipalSlug);
+    if (!$xml) {
+        throw new \Exception("tour.xml missing for {$municipalSlug}");
+    }
+
+    $val     = $published ? 'true' : 'false';
+    $visible = $published ? 'true' : 'false';
+    $enabled = $published ? 'true' : 'false';
+    $alpha   = $published ? '1'    : '0';
+
+    // --------- SCENE TAG ---------
+    $xml = preg_replace_callback(
+        '/<scene\b([^>]*\bname="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i',
+        function ($m) use ($val) {
+            $tag = $m[0];
+
+            if (stripos($tag, 'ispublished="') !== false) {
+                return preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
+            }
+            return rtrim($tag, '>') . ' ispublished="'.$val.'">';
+        },
+        $xml
+    );
+
+    // --------- LAYERS LINKED TO SCENE ---------
+    $xml = preg_replace_callback(
+        '/<layer\b([^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i',
+        function ($m) use ($val, $visible, $enabled, $alpha) {
+            $tag = $m[0];
+
+            // ispublished
+            if (stripos($tag, 'ispublished="') !== false) {
+                $tag = preg_replace('/\bispublished="(true|false)"/i', 'ispublished="'.$val.'"', $tag);
+            } else {
+                $tag = rtrim($tag, '>') . ' ispublished="'.$val.'">';
+            }
+
+            // visible
+            if (stripos($tag, 'visible="') !== false) {
+                $tag = preg_replace('/\bvisible="(true|false)"/i', 'visible="'.$visible.'"', $tag);
+            } else {
+                $tag = rtrim($tag, '>') . ' visible="'.$visible.'">';
+            }
+
+            // enabled
+            if (stripos($tag, 'enabled="') !== false) {
+                $tag = preg_replace('/\benabled="(true|false)"/i', 'enabled="'.$enabled.'"', $tag);
+            } else {
+                $tag = rtrim($tag, '>') . ' enabled="'.$enabled.'">';
+            }
+
+            // alpha
+            if (preg_match('/\balpha="[^"]*"/i', $tag)) {
+                $tag = preg_replace('/\balpha="[^"]*"/i', 'alpha="'.$alpha.'"', $tag);
+            } else {
+                $tag = rtrim($tag, '>') . ' alpha="'.$alpha.'">';
+            }
+
+            return $tag;
+        },
+        $xml
+    );
+
+    $this->saveTourXmlToS3($municipalSlug, $xml);
+}
+
 }
