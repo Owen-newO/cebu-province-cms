@@ -568,7 +568,7 @@ class SceneController extends Controller
 
         $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $layer = "
 <layer name=\"{$safeTitle}\" 
@@ -619,7 +619,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
@@ -667,7 +667,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
@@ -718,7 +718,7 @@ class SceneController extends Controller
 
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -765,7 +765,7 @@ class SceneController extends Controller
 
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -812,7 +812,7 @@ class SceneController extends Controller
 
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -859,7 +859,7 @@ class SceneController extends Controller
 
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -909,7 +909,7 @@ class SceneController extends Controller
 
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
@@ -960,7 +960,7 @@ class SceneController extends Controller
 
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1007,7 +1007,7 @@ class SceneController extends Controller
 
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1054,7 +1054,7 @@ class SceneController extends Controller
 
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1101,7 +1101,7 @@ class SceneController extends Controller
 
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
-        $publish    = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;

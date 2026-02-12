@@ -217,11 +217,11 @@ class ScenePipelineService
         $thumb   = ltrim($thumb, '/');
         $preview = ltrim($preview, '/');
         $cubeUrl = ltrim($cubeUrl, '/');
-        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+       
 
 
         $sceneBlock = "
-<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\">
+<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" published=\"{$validated['is_published']}\">
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
