@@ -41,9 +41,7 @@ const filteredDrafts = computed(() => {
   const q = (draftSearchQuery.value || "").trim().toLowerCase();
   return drafts.value.filter((scene) => {
     if (!q) return true;
-    return [scene.title, scene.location, scene.barangay, scene.category]
-      .filter(Boolean)
-      .some((v) => String(v).toLowerCase().includes(q));
+    return String(scene.title || "").toLowerCase().includes(q);
   });
 });
 
@@ -77,14 +75,7 @@ const filteredScenes = computed(() => {
 
     const searchMatch = !q
       ? true
-      : [
-          scene.title,
-          scene.location,
-          scene.barangay,
-          scene.category,
-        ]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q));
+      : String(scene.title || "").toLowerCase().includes(q);
 
     return barangayMatch && categoryMatch && searchMatch;
   });
