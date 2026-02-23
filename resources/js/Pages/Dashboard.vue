@@ -12,6 +12,8 @@ const props = defineProps({
   municipal: String,
 });
 
+
+
 const publishDraft = (id) => {
   router.post(route("scenes.publish", id), {}, {
     preserveScroll: true,
@@ -29,10 +31,21 @@ const activeTab = ref("scene");
 const activeGroupTitle = ref(null);
 const activeGroupCount = ref(0);
 const showModal = ref(true);
-
+const searchQuery = ref("");
 const sceneModal = ref(null);
 const imageFailed = ref({});
 const imageCheckIntervals = {};
+const draftSearchQuery = ref("");
+
+const filteredDrafts = computed(() => {
+  const q = (draftSearchQuery.value || "").trim().toLowerCase();
+  return drafts.value.filter((scene) => {
+    if (!q) return true;
+    return [scene.title, scene.location, scene.barangay, scene.category]
+      .filter(Boolean)
+      .some((v) => String(v).toLowerCase().includes(q));
+  });
+});
 
 const checkThumbnailReady = (sceneId, src) => {
   if (imageCheckIntervals[sceneId]) return;
@@ -51,14 +64,29 @@ const checkThumbnailReady = (sceneId, src) => {
 
 
 const filteredScenes = computed(() => {
+  const q = (searchQuery.value || "").trim().toLowerCase();
+
   return scenes.value.filter((scene) => {
     const barangayMatch = activeBarangay.value
       ? scene.barangay === activeBarangay.value
       : true;
+
     const categoryMatch = activeCategory.value
       ? scene.category === activeCategory.value
       : true;
-    return barangayMatch && categoryMatch;
+
+    const searchMatch = !q
+      ? true
+      : [
+          scene.title,
+          scene.location,
+          scene.barangay,
+          scene.category,
+        ]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q));
+
+    return barangayMatch && categoryMatch && searchMatch;
   });
 });
 
@@ -284,6 +312,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           style="background-color:white; margin:20px 40px; padding:10px 10px; display:flex; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid #e5e7eb; border-radius:10px;"
         >
           <input
+            v-model="searchQuery"
             type="text"
             placeholder="Search scene..."
             style="width:900px; padding:10px 14px; border:1px solid #d1d5db; border-radius:12px; outline:none;"
@@ -607,6 +636,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           style="display:flex; align-items:center; gap:12px; margin-bottom:20px;"
         >
           <input
+            v-model="draftSearchQuery"
             type="text"
             placeholder="Search scene..."
             style="flex:1; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px;"
