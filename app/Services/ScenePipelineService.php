@@ -264,7 +264,7 @@ class ScenePipelineService
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
     keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 
     barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\" ispublished=\"{$isPublishedAttr}\">
-    <layer type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
+    <layer name=\"$text_$safeTitle\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
 </layer>
