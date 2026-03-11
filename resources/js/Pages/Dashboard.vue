@@ -242,7 +242,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           @click="activeTab='scene'"
           :style="activeTab==='scene'?activeBtn:btn"
         >
-          Manage 360° Scene
+          Dashboard
         </button>
         <button
           @click="activeTab='barangay'"
