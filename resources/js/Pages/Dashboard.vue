@@ -5,6 +5,14 @@ import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed } from "vue";
 
+const handleView = (scene) => {
+  const municipal = encodeURIComponent(scene.municipal);
+  const foldername = encodeURIComponent(scene.foldername);
+
+  const url = `https://www.mata.ph/cebu/${municipal}/${foldername}/tour.html`;
+  window.open(url, '_blank');
+};
+
 const props = defineProps({
   scenes: Array,
   drafts: Array,
@@ -580,6 +588,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
                 <button
+                @click="handleView(scene)"
                   style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
                 >
                   <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
