@@ -8,7 +8,10 @@ import { computed } from "vue";
 const handleView = (scene) => {
   if (!scene.panorama_path) return;
 
-  const url = scene.panorama_path.replace(/\/[^/]+$/, "/tour.html");
+  const url = scene.panorama_path
+    .replace("https://s3.ap-southeast-1.amazonaws.com/mata.ph/", "https://www.mata.ph/")
+    .replace(/\/[^/]+$/, "/tour.html");
+
   window.open(url, "_blank");
 };
 
