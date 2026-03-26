@@ -6,16 +6,8 @@ import addSceneModal from "./addSceneModal.vue";
 import { computed } from "vue";
 
 const handleView = (scene) => {
-  const municipal = props.municipal;
-  const folder = scene.id;
-
-  if (!municipal || !folder) {
-    console.error("Missing municipal or scene id", { municipal, scene });
-    return;
-  }
-
-  const url = `https://www.mata.ph/cebu/${encodeURIComponent(municipal)}/${encodeURIComponent(folder)}/tour.html`;
-  window.open(url, "_blank");
+  const url = `https://www.mata.ph/cebu/${encodeURIComponent(scene.municipal)}/${encodeURIComponent(scene.timestamp_foldername)}/tour.html`;
+  window.open(url, '_blank');
 };
 
 const props = defineProps({
