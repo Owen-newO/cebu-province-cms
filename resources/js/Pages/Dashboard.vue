@@ -6,8 +6,10 @@ import addSceneModal from "./addSceneModal.vue";
 import { computed } from "vue";
 
 const handleView = (scene) => {
-  const url = `https://www.mata.ph/cebu/${encodeURIComponent(scene.municipal)}/${encodeURIComponent(scene.timestamp_foldername)}/tour.html`;
-  window.open(url, '_blank');
+  if (!scene.panorama_path) return;
+
+  const url = scene.panorama_path.replace(/\/[^/]+$/, "/tour.html");
+  window.open(url, "_blank");
 };
 
 const props = defineProps({
