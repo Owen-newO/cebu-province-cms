@@ -114,6 +114,7 @@ class ScenePipelineService
 
         $this->removeSceneFromXml($sceneId, $municipalSlug);
         $this->removeLayerFromXml($sceneId, $municipalSlug);
+        $this->removeDirectionsFromXml($sceneId, $municipalSlug);
         $this->forceDeleteS3Directory("{$municipalSlug}/{$sceneId}");
     }
 
@@ -246,6 +247,7 @@ class ScenePipelineService
         $this->appendfacebook($validated['facebook'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
         $this->appendinstagram($validated['instagram'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
         $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+        $this->appendDirectionsToXml($validated['how_to_get_there'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
     }
 
     private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug, $validated)
@@ -781,13 +783,13 @@ class ScenePipelineService
         ]);
     }
 
-    private function appendtiktok($tiktok, $title, $sceneId, $municipalSlug)
+    private function appendtiktok($tiktok, $title, $sceneId, $municipalSlug, $validated = [])
     {
         if (!$tiktok) return;
 
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
-         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+        $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -960,8 +962,192 @@ class ScenePipelineService
     }, $xml);
 
     $this->saveTourXmlToS3($municipalSlug, $xml);
+
+    // Also update directions.xml (button + modal layers)
+    $this->setPublishedFlagInDirections($sceneId, $municipalSlug, $published);
 }
 
+private function setPublishedFlagInDirections(string $sceneId, string $municipalSlug, bool $published): void
+{
+    $xml = $this->loadDirectionsXmlFromS3($municipalSlug);
+    if (!$xml) return;
 
+    $val     = $published ? 'true' : 'false';
+    $enabled = $published ? 'true' : 'false';
+
+    $pattern = '/<layer\b([^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(\/?>)/i';
+
+    $xml = preg_replace_callback($pattern, function ($m) use ($val, $enabled) {
+        $tag    = $m[0];
+        $setAttr = function (string $tag, string $attr, string $value): string {
+            if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
+                return preg_replace('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $attr . '="' . $value . '"', $tag);
+            }
+            return preg_replace('/\s*(\/?>)\s*$/', ' ' . $attr . '="' . $value . '"$1', $tag);
+        };
+        $tag = $setAttr($tag, 'ispublished', $val);
+        $tag = $setAttr($tag, 'enabled',     $enabled);
+        return $tag;
+    }, $xml);
+
+    $this->saveDirectionsXmlToS3($municipalSlug, $xml);
+}
+
+/* ================= DIRECTIONS XML ================= */
+
+private function loadDirectionsXmlFromS3(string $municipalSlug): string
+{
+    $key = "{$municipalSlug}/directions.xml";
+    if (Storage::disk('s3')->exists($key)) {
+        return Storage::disk('s3')->get($key);
+    }
+    return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<krpano>\n</krpano>";
+}
+
+private function saveDirectionsXmlToS3(string $municipalSlug, string $xml): void
+{
+    Storage::disk('s3')->put("{$municipalSlug}/directions.xml", $xml);
+}
+
+private function ensureDirectionsIncluded(string $municipalSlug): void
+{
+    $xml = $this->loadTourXmlFromS3($municipalSlug);
+    if (!$xml || stripos($xml, 'directions.xml') !== false) return;
+
+    // Insert after last <include .../> tag, or right after opening <krpano...>
+    if (preg_match('/<include\b[^>]*\/>/i', $xml)) {
+        $xml = preg_replace('/(<include\b[^>]*\/>)(?![\s\S]*<include\b)/i', '$1' . "\n<include url=\"directions.xml\"/>", $xml);
+    } else {
+        $xml = preg_replace('/(<krpano\b[^>]*>)/i', '$1' . "\n<include url=\"directions.xml\"/>", $xml, 1);
+    }
+
+    $this->saveTourXmlToS3($municipalSlug, $xml);
+}
+
+private function appendDirectionsToXml(string $howToGetThere, string $title, string $sceneId, string $municipalSlug, array $validated): void
+{
+    if (!$howToGetThere) return;
+
+    $this->ensureDirectionsIncluded($municipalSlug);
+
+    $xml             = $this->loadDirectionsXmlFromS3($municipalSlug);
+    $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+    $safeTitle       = htmlspecialchars($title, ENT_QUOTES);
+    $safeText        = htmlspecialchars($howToGetThere, ENT_QUOTES);
+
+    $block = "
+<layer
+    name=\"directions_btn_{$sceneId}\"
+    type=\"text\"
+    text=\"&#128205; How to Get There\"
+    width=\"90%\"
+    height=\"auto\"
+    autoheight=\"true\"
+    parent=\"scrollarea5\"
+    enabled=\"false\"
+    ispublished=\"{$isPublishedAttr}\"
+    bgcolor=\"0x2563eb\"
+    bgalpha=\"1\"
+    bgroundedge=\"20\"
+    padding=\"8\"
+    css=\"color:#ffffff; font-size:150%; font-family:Chewy; text-align:center; cursor:pointer;\"
+    places=\"{$safeTitle}\"
+    linkedscene=\"scene_{$sceneId}\"
+    onclick=\"set(layer[directions_modal_{$sceneId}].visible, true);\"
+/>
+<layer
+    name=\"directions_modal_{$sceneId}\"
+    type=\"container\"
+    keep=\"true\"
+    visible=\"false\"
+    width=\"550\"
+    height=\"auto\"
+    align=\"center\"
+    bgcolor=\"0xffffff\"
+    bgalpha=\"0.97\"
+    bgroundedge=\"14\"
+    zorder=\"500\"
+    linkedscene=\"scene_{$sceneId}\"
+    ispublished=\"{$isPublishedAttr}\"
+>
+    <layer name=\"directions_modal_close_{$sceneId}\"
+        type=\"text\"
+        text=\"&#10005;\"
+        width=\"36\"
+        height=\"36\"
+        align=\"righttop\"
+        x=\"-12\"
+        y=\"12\"
+        css=\"color:#444444; font-size:220%; cursor:pointer; font-weight:bold;\"
+        onclick=\"set(parent.visible, false);\"
+    />
+    <layer name=\"directions_modal_headertxt_{$sceneId}\"
+        type=\"text\"
+        text=\"How to Get There\"
+        width=\"85%\"
+        height=\"auto\"
+        autoheight=\"true\"
+        align=\"centertop\"
+        y=\"16\"
+        css=\"color:#111111; font-size:250%; font-family:Chewy; text-align:center;\"
+    />
+    <layer name=\"directions_modal_divider_{$sceneId}\"
+        type=\"container\"
+        width=\"90%\"
+        height=\"2\"
+        align=\"centertop\"
+        y=\"62\"
+        bgcolor=\"0xe5e7eb\"
+        bgalpha=\"1\"
+    />
+    <layer name=\"directions_modal_body_{$sceneId}\"
+        type=\"text\"
+        text=\"{$safeText}\"
+        width=\"88%\"
+        height=\"auto\"
+        autoheight=\"true\"
+        align=\"centertop\"
+        y=\"76\"
+        bgcolor=\"0x000000\"
+        bgalpha=\"0\"
+        css=\"color:#333333; font-size:150%; font-family:Chewy; text-align:left; padding:10px;\"
+    />
+</layer>
+";
+
+    $xml = str_replace('</krpano>', $block . "\n</krpano>", $xml);
+    $this->saveDirectionsXmlToS3($municipalSlug, $xml);
+
+    Log::info('📍 Directions layers injected into directions.xml', [
+        'sceneId'       => $sceneId,
+        'municipalSlug' => $municipalSlug,
+    ]);
+}
+
+private function removeDirectionsFromXml(string $sceneId, string $municipalSlug): void
+{
+    $xml = $this->loadDirectionsXmlFromS3($municipalSlug);
+
+    // Remove container layers with children
+    $xml = preg_replace(
+        '/<layer\b[^>]*name="directions_[^"]*' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is',
+        '',
+        $xml
+    );
+
+    // Remove self-closing layers
+    $xml = preg_replace(
+        '/<layer\b[^>]*name="directions_[^"]*' . preg_quote($sceneId, '/') . '"[^>]*\/>/is',
+        '',
+        $xml
+    );
+
+    $this->saveDirectionsXmlToS3($municipalSlug, $xml);
+
+    Log::info('🗑 Directions layers removed from directions.xml', [
+        'sceneId'       => $sceneId,
+        'municipalSlug' => $municipalSlug,
+    ]);
+}
 
 }

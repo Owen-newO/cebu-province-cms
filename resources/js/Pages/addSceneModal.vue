@@ -14,7 +14,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 
 const showModal = ref(false);
 const existingScenes = ref([]);
-const existingScenesFull = ref({}); // 👈 ADDED — store full existing scenes
+const existingScenesFull = ref({});
+const activeTab = ref("info");
 
 // -----------------------------------------------------------
 // mode + editing
@@ -41,6 +42,7 @@ const makeEmptyScene = () => ({
   facebook: "",
   instagram: "",
   tiktok: "",
+  how_to_get_there: "",
 });
 
 const scene = ref(makeEmptyScene());
@@ -80,6 +82,7 @@ const openModal = () => {
   mode.value = "create";
   editingId.value = null;
   scene.value = makeEmptyScene();
+  activeTab.value = "info";
   showModal.value = true;
 };
 
@@ -103,6 +106,7 @@ const openForEdit = (initialScene) => {
     facebook: initialScene.facebook || "",
     instagram: initialScene.instagram || "",
     tiktok: initialScene.tiktok || "",
+    how_to_get_there: initialScene.how_to_get_there || "",
     panorama: null,
     previewUrl:
       initialScene.img ||
@@ -110,6 +114,7 @@ const openForEdit = (initialScene) => {
       null,
   };
 
+  activeTab.value = "info";
   showModal.value = true;
 };
 
@@ -212,6 +217,7 @@ watch(() => scene.value.existingScene, (val) => {
   scene.value.facebook = data.facebook || "";
   scene.value.instagram = data.instagram || "";
   scene.value.tiktok = data.tiktok || "";
+  scene.value.how_to_get_there = data.how_to_get_there || "";
 
   // Editable fields reset
   scene.value.location = "";
@@ -240,6 +246,7 @@ const submitScene = (isPublished) => {
   formData.append("facebook", scene.value.facebook);
   formData.append("instagram", scene.value.instagram);
   formData.append("tiktok", scene.value.tiktok);
+  formData.append("how_to_get_there", scene.value.how_to_get_there || "");
   formData.append("is_published", isPublished ? "true" : "false");
 
   if (scene.value.panorama)
@@ -281,6 +288,7 @@ const updateScene = () => {
   formData.append("facebook", scene.value.facebook);
   formData.append("instagram", scene.value.instagram);
   formData.append("tiktok", scene.value.tiktok);
+  formData.append("how_to_get_there", scene.value.how_to_get_there || "");
   formData.append("is_published", "true");
 
   router.visit(route("scenes.update", editingId.value), {
@@ -369,8 +377,25 @@ const updateScene = () => {
         {{ mode === 'create' ? 'Add New 360° Scenes' : 'Edit 360° Scene' }}
       </h2>
 
+      <!-- TABS -->
+      <div style="display:flex;gap:24px;margin-bottom:4px;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;" @click="activeTab = 'info'">
+          <span :style="activeTab === 'info' ? 'font-size:14px;font-weight:600;color:#2563eb;' : 'font-size:14px;font-weight:500;color:#9ca3af;'">
+            Scene Info
+          </span>
+          <div :style="activeTab === 'info' ? 'height:2px;width:100%;background:#2563eb;border-radius:2px;' : 'height:2px;width:100%;background:#d1d5db;border-radius:2px;'"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;" @click="activeTab = 'directions'">
+          <span :style="activeTab === 'directions' ? 'font-size:14px;font-weight:600;color:#2563eb;' : 'font-size:14px;font-weight:500;color:#9ca3af;'">
+            How to Get There
+          </span>
+          <div :style="activeTab === 'directions' ? 'height:2px;width:100%;background:#2563eb;border-radius:2px;' : 'height:2px;width:100%;background:#d1d5db;border-radius:2px;'"></div>
+        </div>
+      </div>
+
       <!-- 2 COLUMN GRID -->
       <div
+        v-if="activeTab === 'info'"
         style="
           display:grid;
           grid-template-columns:1.1fr 0.9fr;
@@ -653,44 +678,78 @@ const updateScene = () => {
         </div>
       </div>
 
+      <!-- HOW TO GET THERE TAB -->
+      <div v-if="activeTab === 'directions'" style="display:flex;flex-direction:column;gap:8px;">
+        <label style="font-size:15px;font-weight:600;color:#111;">
+          How to Get There <span style="font-weight:400;color:#6b7280;">(Optional)</span>
+        </label>
+        <textarea
+          v-model="scene.how_to_get_there"
+          rows="8"
+          placeholder="e.g., From Cebu City, take a bus heading to the south terminal and ride a jeepney to the entrance gate. The place is accessible by private vehicle via the national highway..."
+          style="
+            width:100%;padding:12px;border-radius:10px;
+            border:1px solid #d1d5db;background:#EEEDED;
+            font-size:14px;resize:vertical;box-sizing:border-box;
+          "
+        ></textarea>
+      </div>
+
       <!-- FOOTER BUTTONS -->
       <div style="display:flex;justify-content:space-between;gap:12px;margin-top:15px;">
         
         <template v-if="mode==='create'">
           <div style="display:flex;justify-content:space-between;gap:15px;">
-          <button
-          @click="closeModal"
-          style="
-            padding:10px 30px;border:1px solid #d1d5db;
-            border-radius:30px;background:white;cursor:pointer;color:black;
-            font-size:15px;
-          "
-        >
-          Cancel
-        </button>
+            <button
+              @click="closeModal"
+              style="
+                padding:10px 30px;border:1px solid #d1d5db;
+                border-radius:30px;background:white;cursor:pointer;color:black;
+                font-size:15px;
+              "
+            >
+              Cancel
+            </button>
 
+            <button
+              v-if="activeTab === 'directions'"
+              @click="saveDraft"
+              style="
+                padding:10px 30px;background:#22c55e;
+                border:none;color:black;border-radius:30px;
+                font-size:15px;cursor:pointer;
+              "
+            >
+              Save Draft
+            </button>
+          </div>
+
+          <!-- Tab 1: Next button -->
           <button
-            @click="saveDraft"
+            v-if="activeTab === 'info'"
+            @click="activeTab = 'directions'"
             style="
-              padding:10px 30px;background:#22c55e;
-              border:none;color:black;border-radius:30px;
-              font-size:15px;cursor:pointer;
-            "
-          >
-            Save Draft
-          </button>
-         </div>
-          <button
-            @click="publishScene"
-            style="
-              padding:10px 30px;background:#2563eb; 
+              padding:10px 30px;background:#2563eb;
               border:none;color:white;border-radius:30px;
               font-size:15px;cursor:pointer;
             "
           >
-          <span style="flex-direction: row; display: flex; gap: 5px; ">
-            <img src="/images/plane.png" style="width:15px;opacity:1;height: 15px;align-self: center;" /> <span>Publish</span>
-           </span>
+            Next →
+          </button>
+
+          <!-- Tab 2: Publish button -->
+          <button
+            v-if="activeTab === 'directions'"
+            @click="publishScene"
+            style="
+              padding:10px 30px;background:#2563eb;
+              border:none;color:white;border-radius:30px;
+              font-size:15px;cursor:pointer;
+            "
+          >
+            <span style="flex-direction:row;display:flex;gap:5px;">
+              <img src="/images/plane.png" style="width:15px;opacity:1;height:15px;align-self:center;" /> <span>Publish</span>
+            </span>
           </button>
         </template>
 

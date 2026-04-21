@@ -23,6 +23,7 @@ class Scene extends Model
         'facebook',
         'instagram',
         'tiktok',
+        'how_to_get_there',
         'panorama_path',
         'is_published',
     ];

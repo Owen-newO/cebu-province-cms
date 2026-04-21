@@ -225,8 +225,9 @@ class SceneController extends Controller
         'email'           => 'nullable|string|max:255',
         'website'         => 'nullable|string',
         'facebook'        => 'nullable|string',
-        'instagram'       => 'nullable|string',
-        'tiktok'          => 'nullable|string',
+        'instagram'          => 'nullable|string',
+        'tiktok'             => 'nullable|string',
+        'how_to_get_there'   => 'nullable|string',
 
         'is_published'    => 'required',
 
