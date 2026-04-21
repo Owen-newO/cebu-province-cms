@@ -1187,27 +1187,50 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     $validated['is_published']     = $validated['is_published'] === "true" ? 1 : 0;
 
     $municipalSlug = $this->municipalSlug($scene->municipal);
-    $sceneId       = pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME);
+
+    // Shared fields — applied to ALL scenes in the same group (same title + municipal)
+    $sharedFields = [
+        'barangay'         => $validated['barangay']        ?? '',
+        'category'         => $validated['category']        ?? '',
+        'address'          => $validated['address']         ?? '',
+        'google_map_link'  => $validated['google_map_link'] ?? '',
+        'contact_number'   => $validated['contact_number']  ?? '',
+        'email'            => $validated['email']           ?? '',
+        'website'          => $validated['website']         ?? '',
+        'facebook'         => $validated['facebook']        ?? '',
+        'instagram'        => $validated['instagram']       ?? '',
+        'tiktok'           => $validated['tiktok']          ?? '',
+        'how_to_get_there' => $validated['how_to_get_there'] ?? '',
+    ];
 
     // -------------------------------------------------------
-    // Update DB first
+    // Update ALL scenes in the group (same title + municipal)
     // -------------------------------------------------------
-    $scene->update($validated);
+    $groupScenes = Scene::where('title', $scene->title)
+        ->where('municipal', $scene->municipal)
+        ->get();
 
-    // -------------------------------------------------------
-    // Update XML metadata (NO re-tiling)
-    // -------------------------------------------------------
-    $this->updateSceneMetaInXml($sceneId, $validated, $municipalSlug);
-    $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
+    foreach ($groupScenes as $groupScene) {
+        $groupSceneId = pathinfo(parse_url($groupScene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME);
 
-    // -------------------------------------------------------
-    // Update directions.xml
-    // -------------------------------------------------------
-    $pipeline->updateDirections($sceneId, $municipalSlug, $validated);
+        // Per-scene fields only update the edited scene
+        if ($groupScene->id === $scene->id) {
+            $groupScene->update(array_merge($sharedFields, [
+                'location' => $validated['location'] ?? $groupScene->location,
+            ]));
+        } else {
+            $groupScene->update($sharedFields);
+        }
+
+        // Update XML for each scene in the group
+        $this->updateSceneMetaInXml($groupSceneId, array_merge($validated, $sharedFields), $municipalSlug);
+        $this->updateLayerMetaInXml($groupSceneId, array_merge($validated, $sharedFields), $municipalSlug);
+        $pipeline->updateDirections($groupSceneId, $municipalSlug, array_merge($validated, $sharedFields));
+    }
 
     return redirect()
         ->route('Dashboard')
-        ->with('success', 'Scene updated successfully.');
+        ->with('success', 'Scene and all grouped scenes updated successfully.');
 }
 
 
