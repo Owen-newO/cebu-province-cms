@@ -107,6 +107,18 @@ class ScenePipelineService
         $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
     }
 
+    public function updateDirections(string $sceneId, string $municipalSlug, array $validated): void
+    {
+        // Remove old directions layers then re-add with updated text
+        $this->removeDirectionsFromXml($sceneId, $municipalSlug);
+
+        $howToGetThere = $validated['how_to_get_there'] ?? '';
+        if ($howToGetThere) {
+            $this->ensureDirectionsXmlExists($municipalSlug);
+            $this->appendDirectionsToXml($howToGetThere, $validated['title'] ?? '', $sceneId, $municipalSlug, $validated);
+        }
+    }
+
     public function deleteScene(Scene $scene): void
     {
         $sceneId = pathinfo($scene->panorama_path, PATHINFO_FILENAME);
@@ -221,9 +233,11 @@ class ScenePipelineService
         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
        
 
-
+        $howToGetThere = $validated['how_to_get_there'] ?? '';
+        $howToGetThere = str_replace(["\r\n", "\r", "\n"], "<br/>", $howToGetThere);
+        $howToGetThere = htmlspecialchars($howToGetThere, ENT_QUOTES, 'UTF-8');  
         $sceneBlock = "
-<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\">
+<scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\"  how_to_get_there=\"{$howToGetThere}\">
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />

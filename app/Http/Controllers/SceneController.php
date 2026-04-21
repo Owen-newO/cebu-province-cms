@@ -1169,23 +1169,25 @@ class SceneController extends Controller
 // -----------------------------------------------------------
 // UPDATE
 // -----------------------------------------------------------
-public function update(Request $request, $id)
+public function update(Request $request, $id, ScenePipelineService $pipeline)
 {
     $scene = Scene::findOrFail($id);
 
     // validate (note: updating = true)
     $validated = $this->validateScene($request, true);
 
-    $validated['google_map_link'] = $this->extractIframeSrc($request->google_map_link);
-    $validated['contact_number']  = $request->contact_number;
-    $validated['email']           = $request->email;
-    $validated['website']         = $request->website;
-    $validated['facebook']        = $request->facebook;
-    $validated['instagram']       = $request->instagram;
-    $validated['tiktok']          = $request->tiktok;
-    $validated['is_published']    = $validated['is_published'] === "true" ? 1 : 0;
+    $validated['google_map_link']  = $this->extractIframeSrc($request->google_map_link);
+    $validated['contact_number']   = $request->contact_number;
+    $validated['email']            = $request->email;
+    $validated['website']          = $request->website;
+    $validated['facebook']         = $request->facebook;
+    $validated['instagram']        = $request->instagram;
+    $validated['tiktok']           = $request->tiktok;
+    $validated['how_to_get_there'] = $request->how_to_get_there ?? '';
+    $validated['is_published']     = $validated['is_published'] === "true" ? 1 : 0;
 
     $municipalSlug = $this->municipalSlug($scene->municipal);
+    $sceneId       = pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME);
 
     // -------------------------------------------------------
     // Update DB first
@@ -1195,17 +1197,13 @@ public function update(Request $request, $id)
     // -------------------------------------------------------
     // Update XML metadata (NO re-tiling)
     // -------------------------------------------------------
-    $this->updateSceneMetaInXml(
-        pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME),
-        $validated,
-        $municipalSlug
-    );
+    $this->updateSceneMetaInXml($sceneId, $validated, $municipalSlug);
+    $this->updateLayerMetaInXml($sceneId, $validated, $municipalSlug);
 
-    $this->updateLayerMetaInXml(
-        pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME),
-        $validated,
-        $municipalSlug
-    );
+    // -------------------------------------------------------
+    // Update directions.xml
+    // -------------------------------------------------------
+    $pipeline->updateDirections($sceneId, $municipalSlug, $validated);
 
     return redirect()
         ->route('Dashboard')
