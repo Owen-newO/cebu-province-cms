@@ -247,6 +247,9 @@ class ScenePipelineService
         $this->appendfacebook($validated['facebook'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
         $this->appendinstagram($validated['instagram'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
         $this->appendtiktok($validated['tiktok'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
+
+        // Always ensure directions.xml exists and is included in tour.xml
+        $this->ensureDirectionsXmlExists($municipalSlug);
         $this->appendDirectionsToXml($validated['how_to_get_there'] ?? '', $validated['title'], $sceneId, $municipalSlug, $validated);
     }
 
@@ -1007,6 +1010,21 @@ private function loadDirectionsXmlFromS3(string $municipalSlug): string
 private function saveDirectionsXmlToS3(string $municipalSlug, string $xml): void
 {
     Storage::disk('s3')->put("{$municipalSlug}/directions.xml", $xml);
+}
+
+private function ensureDirectionsXmlExists(string $municipalSlug): void
+{
+    $key = "{$municipalSlug}/directions.xml";
+
+    if (!Storage::disk('s3')->exists($key)) {
+        Storage::disk('s3')->put(
+            $key,
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<krpano>\n</krpano>"
+        );
+        Log::info('📄 directions.xml created on S3', ['municipalSlug' => $municipalSlug]);
+    }
+
+    $this->ensureDirectionsIncluded($municipalSlug);
 }
 
 private function ensureDirectionsIncluded(string $municipalSlug): void
