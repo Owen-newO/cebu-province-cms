@@ -1235,6 +1235,41 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
 
     // =====================================================================
+    // UPDATE SCENE TAG IN XML (title, subtitle, ispublished) — MUNICIPAL, S3
+    // =====================================================================
+    private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
+    {
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) return;
+
+        $pattern = '/<scene\b([^>]*\bname="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i';
+
+        $xml = preg_replace_callback($pattern, function ($m) use ($validated) {
+            $tag   = $m[0];
+            $title = htmlspecialchars($validated['title'] ?? '', ENT_QUOTES);
+            $sub   = htmlspecialchars($validated['location'] ?? '', ENT_QUOTES);
+            $pub   = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+
+            $setAttr = function (string $tag, string $attr, string $value): string {
+                if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
+                    return preg_replace('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $attr . '="' . $value . '"', $tag);
+                }
+                return preg_replace('/\s*>\s*$/', ' ' . $attr . '="' . $value . '">', $tag);
+            };
+
+            $tag = $setAttr($tag, 'title',       $title);
+            $tag = $setAttr($tag, 'places',      $title);
+            $tag = $setAttr($tag, 'subtitle',    $sub);
+            $tag = $setAttr($tag, 'ispublished', $pub);
+            return $tag;
+        }, $xml);
+
+        $this->saveTourXmlToS3($municipalSlug, $xml);
+
+        Log::info("🔄 Scene meta updated in tour.xml (S3)", ['sceneId' => $sceneId]);
+    }
+
+    // =====================================================================
     // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3
     // =====================================================================
     private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
