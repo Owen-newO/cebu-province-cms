@@ -1249,6 +1249,9 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             $title = htmlspecialchars($validated['title'] ?? '', ENT_QUOTES);
             $sub   = htmlspecialchars($validated['location'] ?? '', ENT_QUOTES);
             $pub   = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+            $rawHow = $validated['how_to_get_there'] ?? '';
+            $rawHow = str_replace(["\r\n", "\r", "\n"], "<br/>", $rawHow);
+            $how = htmlspecialchars($rawHow, ENT_QUOTES, 'UTF-8');
 
             $setAttr = function (string $tag, string $attr, string $value): string {
                 if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
@@ -1257,10 +1260,11 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 return preg_replace('/\s*>\s*$/', ' ' . $attr . '="' . $value . '">', $tag);
             };
 
-            $tag = $setAttr($tag, 'title',       $title);
-            $tag = $setAttr($tag, 'places',      $title);
-            $tag = $setAttr($tag, 'subtitle',    $sub);
-            $tag = $setAttr($tag, 'ispublished', $pub);
+            $tag = $setAttr($tag, 'title',             $title);
+            $tag = $setAttr($tag, 'places',            $title);
+            $tag = $setAttr($tag, 'subtitle',          $sub);
+            $tag = $setAttr($tag, 'ispublished',       $pub);
+            $tag = $setAttr($tag, 'how_to_get_there', $how);
             return $tag;
         }, $xml);
 

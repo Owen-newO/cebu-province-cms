@@ -109,14 +109,9 @@ class ScenePipelineService
 
     public function updateDirections(string $sceneId, string $municipalSlug, array $validated): void
     {
-        // Remove old directions layers then re-add with updated text
         $this->removeDirectionsFromXml($sceneId, $municipalSlug);
-
-        $howToGetThere = $validated['how_to_get_there'] ?? '';
-        if ($howToGetThere) {
-            $this->ensureDirectionsXmlExists($municipalSlug);
-            $this->appendDirectionsToXml($howToGetThere, $validated['title'] ?? '', $sceneId, $municipalSlug, $validated);
-        }
+        $this->ensureDirectionsXmlExists($municipalSlug);
+        $this->appendDirectionsToXml($validated['how_to_get_there'] ?? '', $validated['title'] ?? '', $sceneId, $municipalSlug, $validated);
     }
 
     public function deleteScene(Scene $scene): void
@@ -1058,14 +1053,13 @@ private function ensureDirectionsIncluded(string $municipalSlug): void
 
 private function appendDirectionsToXml(string $howToGetThere, string $title, string $sceneId, string $municipalSlug, array $validated): void
 {
-    if (!$howToGetThere) return;
-
     $this->ensureDirectionsIncluded($municipalSlug);
 
     $xml             = $this->loadDirectionsXmlFromS3($municipalSlug);
     $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
     $safeTitle       = htmlspecialchars($title, ENT_QUOTES);
-    $safeText        = htmlspecialchars($howToGetThere, ENT_QUOTES);
+    $displayText     = $howToGetThere ?: 'How to get here will be added soon.';
+    $safeText        = htmlspecialchars($displayText, ENT_QUOTES);
 
     $block = "
 <layer
