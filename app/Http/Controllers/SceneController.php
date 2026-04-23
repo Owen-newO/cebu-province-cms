@@ -1274,63 +1274,131 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     }
 
     // =====================================================================
-    // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3
+    // UPDATE LAYER META IN XML — ALL LAYERS LINKED TO THIS SCENE
     // =====================================================================
     private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
         $xmlContent = $this->loadTourXmlFromS3($municipalSlug);
         if ($xmlContent === null) {
-            Log::error('tour.xml not found when updating layer meta (S3)', [
-                'municipalSlug' => $municipalSlug,
-            ]);
+            Log::error('tour.xml not found when updating layer meta (S3)', ['municipalSlug' => $municipalSlug]);
             return;
         }
 
-        $pattern = '/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is';
+        $newTitle     = htmlspecialchars($validated['title']          ?? '', ENT_QUOTES);
+        $newBarangay  = htmlspecialchars($validated['barangay']        ?? '', ENT_QUOTES);
+        $newCategory  = htmlspecialchars($validated['category']        ?? '', ENT_QUOTES);
+        $newAddress   = htmlspecialchars($validated['address']         ?? '', ENT_QUOTES);
+        $newPhone     = htmlspecialchars($validated['contact_number']  ?? '', ENT_QUOTES);
+        $newEmail     = htmlspecialchars($validated['email']           ?? '', ENT_QUOTES);
+        $newWebsite   = $validated['website']   ?? '';
+        $newFacebook  = $validated['facebook']  ?? '';
+        $newInstagram = $validated['instagram'] ?? '';
+        $newTiktok    = $validated['tiktok']    ?? '';
+        $newMapLink   = htmlspecialchars($validated['google_map_link'] ?? '', ENT_QUOTES);
+        $isPublished  = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+        $textLabel    = ucfirst(strtolower(str_replace('_', ' ', $validated['title'] ?? '')));
 
-        if (!preg_match($pattern, $xmlContent, $matches)) {
-            Log::warning("Layer not found for scene {$sceneId} (S3)", [
-                'municipalSlug' => $municipalSlug,
-            ]);
-            return;
-        }
+        // Helper: set or add an attribute on an opening tag (handles both > and />)
+        $setAttr = function (string $tag, string $attr, string $value): string {
+            if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
+                return preg_replace(
+                    '/\b' . preg_quote($attr, '/') . '="[^"]*"/i',
+                    $attr . '="' . $value . '"',
+                    $tag
+                );
+            }
+            return preg_replace('/\s*(\/?>)\s*$/', ' ' . $attr . '="' . $value . '"$1', $tag);
+        };
 
-        $originalBlock = $matches[0];
+        // Match every opening tag (up to its first > or />) that carries linkedscene for this scene.
+        // [^>]* safely spans newlines since it means "any char except >"
+        $pattern = '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*(\/?>)/i';
 
-        $newName     = $validated['title'] ?? '';
-        $newBarangay = $validated['barangay'] ?? '';
-        $textLabel   = strtoupper(str_replace('_', ' ', $newName));
+        $xmlContent = preg_replace_callback($pattern, function ($m) use (
+            $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
+            $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
+            $newMapLink, $isPublished, $textLabel, $setAttr
+        ) {
+            $tag = $m[0];
 
-        $updated = preg_replace(
-            '/name="[^"]*"/',
-            'name="' . $newName . '"',
-            $originalBlock,
-            1
+            preg_match('/\bname="([^"]*)"/i', $tag, $nm);
+            $layerName = strtolower($nm[1] ?? '');
+
+            // Every linked layer gets updated places + ispublished
+            $tag = $setAttr($tag, 'places',      $newTitle);
+            $tag = $setAttr($tag, 'ispublished', $isPublished);
+
+            if (strpos($layerName, 'barangay_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newBarangay);
+
+            } elseif (strpos($layerName, 'category_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newCategory);
+
+            } elseif (strpos($layerName, 'details_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newAddress);
+
+            } elseif (strpos($layerName, 'number_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newPhone);
+
+            } elseif (strpos($layerName, 'email_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newEmail);
+
+            } elseif (strpos($layerName, 'title_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newTitle);
+
+            } elseif (strpos($layerName, 'website_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newWebsite}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'facebook_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newFacebook}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'instagram_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newInstagram}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'tiktok_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newTiktok}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'iframelayer_') === 0) {
+                $tag = $setAttr($tag, 'iframeurl', $newMapLink);
+
+            } else {
+                // Thumbnail layer: update name + barangay filter attribute
+                $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
+                $tag = $setAttr($tag, 'barangay', $newBarangay);
+            }
+
+            return $tag;
+        }, $xmlContent);
+
+        // Update the display text label nested inside the thumbnail container.
+        // That child layer has type="text" and sits directly after the thumbnail's opening >.
+        $xmlContent = preg_replace_callback(
+            '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*(<layer\b[^>]*\btype="text"\b[^>]*\btext=")[^"]*(")/i',
+            function ($m) use ($textLabel) {
+                return str_replace($m[1] . $m[2], $m[1] . $textLabel . $m[2], $m[0]);
+            },
+            $xmlContent
         );
-
-        $updated = preg_replace(
-            '/barangay="[^"]*"/',
-            'barangay="' . $newBarangay . '"',
-            $updated,
-            1
-        );
-
-        $updated = preg_replace(
-            '/<layer[^>]*type="text"[^>]*text="[^"]*"/',
-            '<layer type="text" text="' . $textLabel . '"',
-            $updated,
-            1
-        );
-
-        $xmlContent = str_replace($originalBlock, $updated, $xmlContent);
 
         $this->saveTourXmlToS3($municipalSlug, $xmlContent);
 
-        Log::info("Updated layer meta for scene {$sceneId} (S3)", [
-            'municipalSlug' => $municipalSlug,
-        ]);
-
-
+        Log::info("Updated all layer meta for scene {$sceneId} (S3)", ['municipalSlug' => $municipalSlug]);
     }
 
     // =====================================================================
