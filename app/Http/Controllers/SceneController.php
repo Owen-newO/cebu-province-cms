@@ -1188,7 +1188,9 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
     $municipalSlug = $this->municipalSlug($scene->municipal);
 
-    // Shared fields — applied to ALL scenes in the same group (same title + municipal)
+    // Shared fields — applied to ALL scenes in the same group (same title + municipal).
+    // location and panorama_path are intentionally excluded: each panorama in a group
+    // has its own unique image and its own location label (e.g. "Main Entrance View").
     $sharedFields = [
         'barangay'         => $validated['barangay']        ?? '',
         'category'         => $validated['category']        ?? '',
@@ -1213,19 +1215,27 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     foreach ($groupScenes as $groupScene) {
         $groupSceneId = pathinfo(parse_url($groupScene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME);
 
-        // Per-scene fields only update the edited scene
         if ($groupScene->id === $scene->id) {
+            // Edited scene: apply shared fields + its own per-scene fields
             $groupScene->update(array_merge($sharedFields, [
-                'location' => $validated['location'] ?? $groupScene->location,
+                'location'     => $validated['location'] ?? $groupScene->location,
+                'is_published' => $validated['is_published'],
             ]));
+            $xmlData = array_merge($validated, $sharedFields);
         } else {
+            // Other scenes in group: apply shared fields only.
+            // Each keeps its own location, panorama_path, and is_published.
             $groupScene->update($sharedFields);
+            $xmlData = array_merge($validated, $sharedFields, [
+                'location'     => $groupScene->location,
+                'is_published' => $groupScene->is_published,
+            ]);
         }
 
-        // Update XML for each scene in the group
-        $this->updateSceneMetaInXml($groupSceneId, array_merge($validated, $sharedFields), $municipalSlug);
-        $this->updateLayerMetaInXml($groupSceneId, array_merge($validated, $sharedFields), $municipalSlug);
-        $pipeline->updateDirections($groupSceneId, $municipalSlug, array_merge($validated, $sharedFields));
+        // Update XML for each scene using its own per-scene values
+        $this->updateSceneMetaInXml($groupSceneId, $xmlData, $municipalSlug);
+        $this->updateLayerMetaInXml($groupSceneId, $xmlData, $municipalSlug);
+        $pipeline->updateDirections($groupSceneId, $municipalSlug, $xmlData);
     }
 
     return redirect()
