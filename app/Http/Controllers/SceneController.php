@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Storage;
 use RecursiveIteratorIterator;
 use RecursiveDirectoryIterator;
 use App\Jobs\ProcessSceneJob;
+use App\Services\ScenePipelineService;
 
 class SceneController extends Controller
 {
@@ -108,32 +109,42 @@ class SceneController extends Controller
 
     $municipalSlug = $this->municipalSlug($validated['municipal']);
     $basePath = "{$municipalSlug}/{$sceneId}";
-
+    $originalKey = "{$basePath}/{$filename}";
     // TEMP DIR
     $tempDir = storage_path("app/tmp_scenes/{$sceneId}");
     if (!file_exists($tempDir)) {
         mkdir($tempDir, 0775, true);
     }
 
-    $tempPanorama = $tempDir . DIRECTORY_SEPARATOR . $filename;
+    $tempPanoramaPath = $tempDir . '/' . $filename;
     $file->move($tempDir, $filename);
 
-    // Upload original pano to S3
-    $originalKey = "{$basePath}/{$filename}";
-    Storage::disk('s3')->put($originalKey, file_get_contents($tempPanorama));
-
-    $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
-    $validated['status'] = 'pending';
-
-    $scene = Scene::create($validated);
-
-    // 🚀 QUEUE THE HEAVY WORK
-    ProcessSceneJob::dispatch(
-        $scene->id,
-        $tempPanorama,
-        $municipalSlug,
-        $validated
+    // upload original to S3
+    Storage::disk('s3')->put(
+        $originalKey,
+        file_get_contents($tempPanoramaPath)
     );
+
+    // after moving the file to tempDir
+        $validated['panorama_path'] = Storage::disk('s3')->url($originalKey);
+        $validated['status'] = 'pending';
+
+        // ❗ remove non-serializable stuff
+        unset($validated['panorama']);
+        unset($validated['panorama_file']);
+        unset($validated['file']);
+
+        $scene = Scene::create($validated);
+
+        ProcessSceneJob::dispatch(
+            $scene->id,
+            $tempPanoramaPath,
+            $municipalSlug,
+            $validated
+        );
+
+
+
 
     return redirect()
         ->route('Dashboard')
@@ -214,8 +225,9 @@ class SceneController extends Controller
         'email'           => 'nullable|string|max:255',
         'website'         => 'nullable|string',
         'facebook'        => 'nullable|string',
-        'instagram'       => 'nullable|string',
-        'tiktok'          => 'nullable|string',
+        'instagram'          => 'nullable|string',
+        'tiktok'             => 'nullable|string',
+        'how_to_get_there'   => 'nullable|string',
 
         'is_published'    => 'required',
 
@@ -246,13 +258,6 @@ class SceneController extends Controller
         }
 
         chdir(base_path());
-
-         $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGAS
-        DyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1O
-        owESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkIN
-        yTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N
-        /hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2R
-        y3sH4qOFjaehW7Y=\"";
         
 
         $out = [];
@@ -448,6 +453,8 @@ class SceneController extends Controller
 
         $title    = htmlspecialchars($validated['title'], ENT_QUOTES);
         $subtitle = htmlspecialchars($validated['location'], ENT_QUOTES);
+        $publish = htmlspecialchars($validated['is_published'], ENT_QUOTES);
+
 
         $newScene = "
 <scene name=\"scene_{$sceneId}\" title=\"{$title}\" subtitle=\"{$subtitle}\" onstart=\"filterLayersByPlace\" places=\"{$title}\" thumburl=\"{$thumb}\">
@@ -563,12 +570,13 @@ class SceneController extends Controller
         $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
 
+
         $layer = "
 <layer name=\"{$safeTitle}\" 
     url=\"{$thumb}\" 
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
-    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 
+    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\" 
     barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\">
     <layer type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\" 
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
@@ -612,6 +620,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="sidemap"[^>]*>)/i';
@@ -634,6 +643,7 @@ class SceneController extends Controller
         height=\"100%\"
         align=\"center\"
         parent=\"sidemap\"
+        publish=\"{$publish}\"
         keep=\"true\"
         places=\"{$title}\"
         linkedscene=\"scene_{$sceneId}\"
@@ -658,6 +668,7 @@ class SceneController extends Controller
 
         $title = htmlspecialchars($title, ENT_QUOTES);
         $xml = $this->loadTourXmlFromS3($municipalSlug);
+
         if ($xml === null) return;
 
         $pattern = '/(<layer\b[^>]*name="scrollarea6"[^>]*>)/i';
@@ -678,6 +689,7 @@ class SceneController extends Controller
         text=\"{$title}\"
         width=\"90%\"
         height=\"auto\"
+        publish=\"{$publish}\"
         autoheight=\"true\"
         enabled=\"false\"
         align=\"centertop\"
@@ -708,6 +720,7 @@ class SceneController extends Controller
         $barangay = htmlspecialchars($barangay, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -726,6 +739,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"100%\"
         parent=\"forbarangay\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         align=\"center\"
         bgcolor=\"0x000000\"
@@ -753,6 +767,7 @@ class SceneController extends Controller
         $category = htmlspecialchars($category, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -772,6 +787,7 @@ class SceneController extends Controller
         height=\"100%\"
         parent=\"forcat\"
         enabled=\"false\"
+        publish=\"{$publish}\"
         align=\"center\"
         bgcolor=\"0x000000\"
         bgalpha=\"0\"
@@ -798,6 +814,7 @@ class SceneController extends Controller
         $address = htmlspecialchars($address, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -816,6 +833,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"auto\"
         parent=\"scrollarea5\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         align=\"centertop\"
         bgcolor=\"0x000000\"
@@ -843,6 +861,7 @@ class SceneController extends Controller
         $contact_number = htmlspecialchars($contact_number, ENT_QUOTES);
         $title          = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -865,6 +884,7 @@ class SceneController extends Controller
         text=\"{$contact_number}\"
         width=\"100%\"
         height=\"100%\"
+        publish=\"{$publish}\"
         enabled=\"false\"
         parent=\"forphone\"
         align=\"center\"
@@ -891,6 +911,8 @@ class SceneController extends Controller
         $email = htmlspecialchars($email, ENT_QUOTES);
         $title = htmlspecialchars($title, ENT_QUOTES);
 
+
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -914,6 +936,7 @@ class SceneController extends Controller
         width=\"100%\"
         height=\"100%\"
         enabled=\"false\"
+        publish=\"{$publish}\"
         parent=\"formail\"
         align=\"center\"
         bgcolor=\"0x000000\"
@@ -939,6 +962,7 @@ class SceneController extends Controller
         $website = htmlspecialchars($website, ENT_QUOTES);
         $title   = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -960,6 +984,7 @@ class SceneController extends Controller
         url=\"skin/browse.png\"
         width=\"prop\"
         height=\"100%\"
+        publish=\"{$publish}\"
         parent=\"forwebsite\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
@@ -984,6 +1009,7 @@ class SceneController extends Controller
         $facebook = htmlspecialchars($facebook, ENT_QUOTES);
         $title    = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -1006,6 +1032,7 @@ class SceneController extends Controller
         width=\"prop\"
         height=\"100%\"
         parent=\"forfb\"
+        publish=\"{$publish}\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
@@ -1028,6 +1055,7 @@ class SceneController extends Controller
 
         $instagram = htmlspecialchars($instagram, ENT_QUOTES);
         $title     = htmlspecialchars($title, ENT_QUOTES);
+
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
@@ -1052,6 +1080,7 @@ class SceneController extends Controller
         height=\"100%\"
         parent=\"forinsta\"
         enabled=\"true\"
+        publish=\"{$publish}\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
         places=\"{$title}\"
         linkedscene=\"scene_{$sceneId}\"
@@ -1074,6 +1103,7 @@ class SceneController extends Controller
         $tiktok = htmlspecialchars($tiktok, ENT_QUOTES);
         $title  = htmlspecialchars($title, ENT_QUOTES);
 
+
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
@@ -1095,6 +1125,7 @@ class SceneController extends Controller
         url=\"skin/tiktok.png\"
         width=\"prop\"
         height=\"100%\"
+        publish=\"{$publish}\"
         parent=\"fortiktok\"
         enabled=\"true\"
         css=\"font-family:Chewy; color:#000000; font-size:150%; text-align:left;\"
@@ -1112,95 +1143,272 @@ class SceneController extends Controller
         ]);
     }
 
+    public function publish(Scene $scene, ScenePipelineService $pipeline)
+{
+    if ((int)$scene->is_published === 1) {
+        return back()->with('info', 'Already published.');
+    }
+
+    $path = parse_url($scene->panorama_path ?? '', PHP_URL_PATH) ?: '';
+    $sceneId = pathinfo($path, PATHINFO_FILENAME);
+
+    if (!$sceneId) {
+        return back()->with('error', 'Missing panorama_path / sceneId.');
+    }
+
+    $municipalSlug = $this->municipalSlug($scene->municipal);
+
+    $scene->update(['is_published' => 1]);
+
+    // ✅ use slug
+    $pipeline->setPublishedFlag($sceneId, $municipalSlug, true);
+
+    return back()->with('success', 'Published. Scene is now visible.');
+}
+
+// -----------------------------------------------------------
+// UPDATE
+// -----------------------------------------------------------
+public function update(Request $request, $id, ScenePipelineService $pipeline)
+{
+    $scene = Scene::findOrFail($id);
+
+    // validate (note: updating = true)
+    $validated = $this->validateScene($request, true);
+
+    $validated['google_map_link']  = $this->extractIframeSrc($request->google_map_link);
+    $validated['contact_number']   = $request->contact_number;
+    $validated['email']            = $request->email;
+    $validated['website']          = $request->website;
+    $validated['facebook']         = $request->facebook;
+    $validated['instagram']        = $request->instagram;
+    $validated['tiktok']           = $request->tiktok;
+    $validated['how_to_get_there'] = $request->how_to_get_there ?? '';
+    $validated['is_published']     = $validated['is_published'] === "true" ? 1 : 0;
+
+    $municipalSlug = $this->municipalSlug($scene->municipal);
+
+    // Shared fields — applied to ALL scenes in the same group (same title + municipal).
+    // location and panorama_path are intentionally excluded: each panorama in a group
+    // has its own unique image and its own location label (e.g. "Main Entrance View").
+    $sharedFields = [
+        'barangay'         => $validated['barangay']        ?? '',
+        'category'         => $validated['category']        ?? '',
+        'address'          => $validated['address']         ?? '',
+        'google_map_link'  => $validated['google_map_link'] ?? '',
+        'contact_number'   => $validated['contact_number']  ?? '',
+        'email'            => $validated['email']           ?? '',
+        'website'          => $validated['website']         ?? '',
+        'facebook'         => $validated['facebook']        ?? '',
+        'instagram'        => $validated['instagram']       ?? '',
+        'tiktok'           => $validated['tiktok']          ?? '',
+        'how_to_get_there' => $validated['how_to_get_there'] ?? '',
+    ];
+
+    // -------------------------------------------------------
+    // Update ALL scenes in the group (same title + municipal)
+    // -------------------------------------------------------
+    $groupScenes = Scene::where('title', $scene->title)
+        ->where('municipal', $scene->municipal)
+        ->get();
+
+    foreach ($groupScenes as $groupScene) {
+        $groupSceneId = pathinfo(parse_url($groupScene->panorama_path, PHP_URL_PATH), PATHINFO_FILENAME);
+
+        if ($groupScene->id === $scene->id) {
+            // Edited scene: apply shared fields + its own per-scene fields
+            $groupScene->update(array_merge($sharedFields, [
+                'location'     => $validated['location'] ?? $groupScene->location,
+                'is_published' => $validated['is_published'],
+            ]));
+            $xmlData = array_merge($validated, $sharedFields);
+        } else {
+            // Other scenes in group: apply shared fields only.
+            // Each keeps its own location, panorama_path, and is_published.
+            $groupScene->update($sharedFields);
+            $xmlData = array_merge($validated, $sharedFields, [
+                'location'     => $groupScene->location,
+                'is_published' => $groupScene->is_published,
+            ]);
+        }
+
+        // Update XML for each scene using its own per-scene values
+        $this->updateSceneMetaInXml($groupSceneId, $xmlData, $municipalSlug);
+        $this->updateLayerMetaInXml($groupSceneId, $xmlData, $municipalSlug);
+        $pipeline->updateDirections($groupSceneId, $municipalSlug, $xmlData);
+    }
+
+    return redirect()
+        ->route('Dashboard')
+        ->with('success', 'Scene and all grouped scenes updated successfully.');
+}
+
+
     // =====================================================================
-    // UPDATE SCENE META IN XML (TITLE / SUBTITLE / PLACES) — MUNICIPAL, S3
+    // UPDATE SCENE TAG IN XML (title, subtitle, ispublished) — MUNICIPAL, S3
     // =====================================================================
     private function updateSceneMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
-        $title    = $validated['title'] ?? '';
-        $subtitle = $validated['location'] ?? '';
+        $pattern = '/<scene\b([^>]*\bname="scene_' . preg_quote($sceneId, '/') . '"[^>]*)>/i';
 
-        $pattern = '/(<scene[^>]*name="scene_' . preg_quote($sceneId, '/') . '"[^>]*)(>)/is';
+        $xml = preg_replace_callback($pattern, function ($m) use ($validated) {
+            $tag   = $m[0];
+            $title = htmlspecialchars($validated['title'] ?? '', ENT_QUOTES);
+            $sub   = htmlspecialchars($validated['location'] ?? '', ENT_QUOTES);
+            $pub   = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+            $rawHow = $validated['how_to_get_there'] ?? '';
+            $rawHow = str_replace(["\r\n", "\r", "\n"], "<br/>", $rawHow);
+            $how = htmlspecialchars($rawHow, ENT_QUOTES, 'UTF-8');
 
-        $replacement = function ($m) use ($title, $subtitle) {
-            $block = $m[1];
+            $setAttr = function (string $tag, string $attr, string $value): string {
+                if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
+                    return preg_replace('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $attr . '="' . $value . '"', $tag);
+                }
+                return preg_replace('/\s*>\s*$/', ' ' . $attr . '="' . $value . '">', $tag);
+            };
 
-            $block = preg_replace('/title="[^"]*"/', 'title="' . $title . '"', $block);
-            $block = preg_replace('/subtitle="[^"]*"/', 'subtitle="' . $subtitle . '"', $block);
-            $block = preg_replace('/places="[^"]*"/', 'places="' . $title . '"', $block);
-
-            return $block . $m[2];
-        };
-
-        $xml = preg_replace_callback($pattern, $replacement, $xml);
+            $tag = $setAttr($tag, 'title',             $title);
+            $tag = $setAttr($tag, 'places',            $title);
+            $tag = $setAttr($tag, 'subtitle',          $sub);
+            $tag = $setAttr($tag, 'ispublished',       $pub);
+            $tag = $setAttr($tag, 'how_to_get_there', $how);
+            return $tag;
+        }, $xml);
 
         $this->saveTourXmlToS3($municipalSlug, $xml);
 
-        Log::info("✏️ Updated scene meta in XML (S3)", [
-            'sceneId'       => $sceneId,
-            'municipalSlug' => $municipalSlug,
-        ]);
+        Log::info("🔄 Scene meta updated in tour.xml (S3)", ['sceneId' => $sceneId]);
     }
 
     // =====================================================================
-    // UPDATE LAYER META IN XML (NAME / BARANGAY / TEXT LABEL) — MUNICIPAL, S3
+    // UPDATE LAYER META IN XML — ALL LAYERS LINKED TO THIS SCENE
     // =====================================================================
     private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
     {
         $xmlContent = $this->loadTourXmlFromS3($municipalSlug);
         if ($xmlContent === null) {
-            Log::error('tour.xml not found when updating layer meta (S3)', [
-                'municipalSlug' => $municipalSlug,
-            ]);
+            Log::error('tour.xml not found when updating layer meta (S3)', ['municipalSlug' => $municipalSlug]);
             return;
         }
 
-        $pattern = '/<layer[^>]*linkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>.*?<\/layer>/is';
+        $newTitle     = htmlspecialchars($validated['title']          ?? '', ENT_QUOTES);
+        $newBarangay  = htmlspecialchars($validated['barangay']        ?? '', ENT_QUOTES);
+        $newCategory  = htmlspecialchars($validated['category']        ?? '', ENT_QUOTES);
+        $newAddress   = htmlspecialchars($validated['address']         ?? '', ENT_QUOTES);
+        $newPhone     = htmlspecialchars($validated['contact_number']  ?? '', ENT_QUOTES);
+        $newEmail     = htmlspecialchars($validated['email']           ?? '', ENT_QUOTES);
+        $newWebsite   = $validated['website']   ?? '';
+        $newFacebook  = $validated['facebook']  ?? '';
+        $newInstagram = $validated['instagram'] ?? '';
+        $newTiktok    = $validated['tiktok']    ?? '';
+        $newMapLink   = htmlspecialchars($validated['google_map_link'] ?? '', ENT_QUOTES);
+        $isPublished  = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
+        $textLabel    = ucfirst(strtolower(str_replace('_', ' ', $validated['title'] ?? '')));
 
-        if (!preg_match($pattern, $xmlContent, $matches)) {
-            Log::warning("Layer not found for scene {$sceneId} (S3)", [
-                'municipalSlug' => $municipalSlug,
-            ]);
-            return;
-        }
+        // Helper: set or add an attribute on an opening tag (handles both > and />)
+        $setAttr = function (string $tag, string $attr, string $value): string {
+            if (preg_match('/\b' . preg_quote($attr, '/') . '="[^"]*"/i', $tag)) {
+                return preg_replace(
+                    '/\b' . preg_quote($attr, '/') . '="[^"]*"/i',
+                    $attr . '="' . $value . '"',
+                    $tag
+                );
+            }
+            return preg_replace('/\s*(\/?>)\s*$/', ' ' . $attr . '="' . $value . '"$1', $tag);
+        };
 
-        $originalBlock = $matches[0];
+        // Match every opening tag (up to its first > or />) that carries linkedscene for this scene.
+        // [^>]* safely spans newlines since it means "any char except >"
+        $pattern = '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*(\/?>)/i';
 
-        $newName     = $validated['title'] ?? '';
-        $newBarangay = $validated['barangay'] ?? '';
-        $textLabel   = strtoupper(str_replace('_', ' ', $newName));
+        $xmlContent = preg_replace_callback($pattern, function ($m) use (
+            $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
+            $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
+            $newMapLink, $isPublished, $textLabel, $setAttr
+        ) {
+            $tag = $m[0];
 
-        $updated = preg_replace(
-            '/name="[^"]*"/',
-            'name="' . $newName . '"',
-            $originalBlock,
-            1
+            preg_match('/\bname="([^"]*)"/i', $tag, $nm);
+            $layerName = strtolower($nm[1] ?? '');
+
+            // Every linked layer gets updated places + ispublished
+            $tag = $setAttr($tag, 'places',      $newTitle);
+            $tag = $setAttr($tag, 'ispublished', $isPublished);
+
+            if (strpos($layerName, 'barangay_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newBarangay);
+
+            } elseif (strpos($layerName, 'category_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newCategory);
+
+            } elseif (strpos($layerName, 'details_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newAddress);
+
+            } elseif (strpos($layerName, 'number_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newPhone);
+
+            } elseif (strpos($layerName, 'email_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newEmail);
+
+            } elseif (strpos($layerName, 'title_text_') === 0) {
+                $tag = $setAttr($tag, 'text', $newTitle);
+
+            } elseif (strpos($layerName, 'website_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newWebsite}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'facebook_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newFacebook}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'instagram_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newInstagram}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'tiktok_text_') === 0) {
+                $tag = preg_replace_callback(
+                    "/onclick=\"openurl\\('[^']*'\\)\"/i",
+                    fn() => "onclick=\"openurl('{$newTiktok}')\"",
+                    $tag
+                );
+
+            } elseif (strpos($layerName, 'iframelayer_') === 0) {
+                $tag = $setAttr($tag, 'iframeurl', $newMapLink);
+
+            } else {
+                // Thumbnail layer: update name + barangay filter attribute
+                $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
+                $tag = $setAttr($tag, 'barangay', $newBarangay);
+            }
+
+            return $tag;
+        }, $xmlContent);
+
+        // Update the display text label nested inside the thumbnail container.
+        // That child layer has type="text" and sits directly after the thumbnail's opening >.
+        $xmlContent = preg_replace_callback(
+            '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*(<layer\b[^>]*\btype="text"\b[^>]*\btext=")[^"]*(")/i',
+            function ($m) use ($textLabel) {
+                return str_replace($m[1] . $m[2], $m[1] . $textLabel . $m[2], $m[0]);
+            },
+            $xmlContent
         );
-
-        $updated = preg_replace(
-            '/barangay="[^"]*"/',
-            'barangay="' . $newBarangay . '"',
-            $updated,
-            1
-        );
-
-        $updated = preg_replace(
-            '/<layer[^>]*type="text"[^>]*text="[^"]*"/',
-            '<layer type="text" text="' . $textLabel . '"',
-            $updated,
-            1
-        );
-
-        $xmlContent = str_replace($originalBlock, $updated, $xmlContent);
 
         $this->saveTourXmlToS3($municipalSlug, $xmlContent);
 
-        Log::info("Updated layer meta for scene {$sceneId} (S3)", [
-            'municipalSlug' => $municipalSlug,
-        ]);
+        Log::info("Updated all layer meta for scene {$sceneId} (S3)", ['municipalSlug' => $municipalSlug]);
     }
 
     // =====================================================================

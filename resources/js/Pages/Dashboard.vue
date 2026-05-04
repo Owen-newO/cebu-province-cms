@@ -5,27 +5,31 @@ import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 import { computed , watch } from "vue";
 
+const handleView = (scene) => {
+  if (!scene.panorama_path) return;
 
-const toast = ref(null);
-const addOptimisticScene = (title) => {
-  scenes.value.unshift({
-    id: `temp-${Date.now()}`,
-    title,
-    status: "queued",
-    barangay: "",
-    category: "",
-    location: "Uploading panorama…",
-    img: "/images/processing-placeholder.jpg",
-    date: new Date().toLocaleDateString(),
-    count: 1,
-  });
+  const url = scene.panorama_path
+    .replace("https://s3.ap-southeast-1.amazonaws.com/mata.ph/", "https://www.mata.ph/")
+    .replace(/\/[^/]+$/, "/tour.html");
+
+  window.open(url, "_blank");
 };
+
 const props = defineProps({
   scenes: Array,
   drafts: Array,
   barangays: Array,
   municipal: String,
 });
+
+
+
+const publishDraft = (id) => {
+  router.post(route("scenes.publish", id), {}, {
+    preserveScroll: true,
+    onSuccess: () => window.location.reload(),
+  });
+};
 const activeBarangay = ref(null);
 const activeCategory = ref(null);
 const showBarangayDropdown = ref(false);
@@ -37,19 +41,53 @@ const activeTab = ref("scene");
 const activeGroupTitle = ref(null);
 const activeGroupCount = ref(0);
 const showModal = ref(true);
-
+const searchQuery = ref("");
 const sceneModal = ref(null);
-watch(showModal, v => console.log("Modal visible:", v));
+const imageFailed = ref({});
+const imageCheckIntervals = {};
+const draftSearchQuery = ref("");
+
+const filteredDrafts = computed(() => {
+  const q = (draftSearchQuery.value || "").trim().toLowerCase();
+  return drafts.value.filter((scene) => {
+    if (!q) return true;
+    return String(scene.title || "").toLowerCase().includes(q);
+  });
+});
+
+const checkThumbnailReady = (sceneId, src) => {
+  if (imageCheckIntervals[sceneId]) return;
+
+  imageCheckIntervals[sceneId] = setInterval(() => {
+    const img = new Image();
+    img.src = src + "?t=" + Date.now(); // bust cache
+
+    img.onload = () => {
+      imageFailed.value[sceneId] = false;
+      clearInterval(imageCheckIntervals[sceneId]);
+      delete imageCheckIntervals[sceneId];
+    };
+  }, 4000); // check every 4s
+};
+
 
 const filteredScenes = computed(() => {
+  const q = (searchQuery.value || "").trim().toLowerCase();
+
   return scenes.value.filter((scene) => {
     const barangayMatch = activeBarangay.value
       ? scene.barangay === activeBarangay.value
       : true;
+
     const categoryMatch = activeCategory.value
       ? scene.category === activeCategory.value
       : true;
-    return barangayMatch && categoryMatch;
+
+    const searchMatch = !q
+      ? true
+      : String(scene.title || "").toLowerCase().includes(q);
+
+    return barangayMatch && categoryMatch && searchMatch;
   });
 });
 
@@ -251,7 +289,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
       <div
         style="width:70px; height:70px; border-radius:50%; background-color:#1e293b; display:flex; justify-content:center; align-items:center; font-size:22px; font-weight:bold;"
       >
-        S
+        {{ municipal.charAt(0).toUpperCase() }}
       </div>
       <p style="margin-top:10px; font-size:18px;">Hi {{ municipal }}</p>
 
@@ -262,7 +300,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           @click="activeTab='scene'"
           :style="activeTab==='scene'?activeBtn:btn"
         >
-          Manage 360° Scene
+          Dashboard
         </button>
         <button
           @click="activeTab='barangay'"
@@ -323,6 +361,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           style="background-color:white; margin:20px 40px; padding:10px 10px; display:flex; align-items:center; flex-wrap:wrap; gap:12px; border-bottom:1px solid #e5e7eb; border-radius:10px;"
         >
           <input
+            v-model="searchQuery"
             type="text"
             placeholder="Search scene..."
             style="width:900px; padding:10px 14px; border:1px solid #d1d5db; border-radius:12px; outline:none;"
@@ -508,12 +547,48 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               </div>
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
+              <div
+              style="
+                position:relative;
+                width:100%;
+                height:180px;
+                border-radius:12px;
+                overflow:hidden;
+                margin-bottom:12px;
+              "
+            >
               <img
+                v-if="!imageFailed[scene.id]"
                 :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
                 loading="lazy"
                 alt=""
-                style="width: 100%; height: 180px; border-radius: 12px; object-fit: cover; margin-bottom: 12px;"
+                style="width:100%; height:100%; object-fit:cover;"
+                @error="
+                  imageFailed[scene.id] = true;
+                  checkThumbnailReady(
+                    scene.id,
+                    getImageUrl(getThumbnail(scene.panorama_path || scene.img))
+                  );
+                "
               />
+
+              <div
+                v-else
+                style="
+                  width:100%;
+                  height:100%;
+                  background:#f3f4f6;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  font-size:16px;
+                  font-weight:600;
+                  color:#6b7280;
+                "
+              >
+                ⏳ Generating…
+              </div>
+                </div>
               <div
                 v-if="scene.count > 1"
                 style="position:absolute; top:10px; right:10px; background:#facc15; color:#000; font-weight:600; font-size:13px; border-radius:20px; padding:4px 10px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,0.25);"
@@ -591,12 +666,9 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
-               <button
-                  @click="sceneModal && sceneModal.openForEdit(scene)"
-                  :disabled="scene.status !== 'done'"
-                  :style="scene.status !== 'done'
-                    ? 'opacity:0.5;pointer-events:none'
-                    : 'flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;'"
+                <button
+                @click="handleView(scene)"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
                 >
                   <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
                 </button>
@@ -646,6 +718,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           style="display:flex; align-items:center; gap:12px; margin-bottom:20px;"
         >
           <input
+            v-model="draftSearchQuery"
             type="text"
             placeholder="Search scene..."
             style="flex:1; padding:10px 14px; border:1px solid #d1d5db; border-radius:8px;"
@@ -719,12 +792,10 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 Delete
               </button>
               <button
-                style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background: #2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                @click="publishDraft(scene.id)"
+                style="flex:1; display:flex; align-items:center; justify-content:center;color:#FFF; gap:6px;background:#2383E2; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
               >
-                <img
-                  src="/images/plane.png"
-                  style="width:15px; height:15px;"
-                />
+                <img src="/images/plane.png" style="width:15px; height:15px;" />
                 Publish
               </button>
             </div>
