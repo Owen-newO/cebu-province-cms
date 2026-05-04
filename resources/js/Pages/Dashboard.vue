@@ -3,7 +3,7 @@ import { ref, onMounted } from "vue";
 import { Head } from "@inertiajs/vue3";
 import { router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
-import { computed } from "vue";
+import { computed , watch } from "vue";
 
 const handleView = (scene) => {
   if (!scene.panorama_path) return;
@@ -147,18 +147,43 @@ const groupByTitle = (list) => {
 
 // ✅ Initialize data on load
 onMounted(() => {
-  allPublishedScenes.value = props.scenes.map((s) => ({
-    ...s,
-    img: getImageUrl(s.panorama_path),
-    date: new Date(s.created_at).toLocaleDateString(),
+  // INITIAL RENDER
+  allPublishedScenes.value = props.scenes.map((scene) => ({
+    ...scene,
+    img: getImageUrl(scene.panorama_path),
+    date: new Date(scene.created_at).toLocaleDateString(),
   }));
+
   scenes.value = groupByTitle(allPublishedScenes.value);
 
-  drafts.value = props.drafts.map((s) => ({
-    ...s,
-    img: getImageUrl(s.panorama_path),
-    date: new Date(s.created_at).toLocaleDateString(),
+  drafts.value = props.drafts.map((scene) => ({
+    ...scene,
+    img: getImageUrl(scene.panorama_path),
+    date: new Date(scene.created_at).toLocaleDateString(),
   }));
+
+  if (!props.municipal) return;
+
+  const poll = setInterval(async () => {
+    const res = await fetch(`/api/scenes/${props.municipal}`);
+    if (!res.ok) return;
+
+    const data = await res.json();
+
+    allPublishedScenes.value = data.map((scene) => ({
+      ...scene,
+      img: getImageUrl(scene.panorama_path),
+      date: new Date(scene.created_at).toLocaleDateString(),
+    }));
+
+    scenes.value = groupByTitle(allPublishedScenes.value);
+
+    const stillProcessing = data.some(
+      (s) => s.status === "queued" || s.status === "processing"
+    );
+
+    if (!stillProcessing) clearInterval(poll);
+  }, 5000);
 });
 
 // ✅ Group filter functions
@@ -187,13 +212,20 @@ const clearGroupFilter = () => {
 
 // ✅ Modal event handlers
 const handlePublishScene = (newScene) => {
+  // 🛑 If this is a queued job, do NOT inject final scene
+  if (newScene?.status === "queued" || newScene?.status === "processing") {
+    return;
+  }
+
+  // ✅ Existing behavior (UNCHANGED)
   scenes.value.unshift({
     ...newScene,
     date: new Date().toLocaleDateString(),
     img: getImageUrl(newScene.panorama_path),
   });
+
   setTimeout(async () => {
-    const response = await fetch("/dashboard");
+    await fetch("/dashboard");
   }, 800);
 };
 const getThumbnail = (panoPath) => {
@@ -230,7 +262,23 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
 
 <template>
   <Head title="Cebu CMS" />
-
+<div
+                  v-if="toast"
+                  style="
+                    position:fixed;
+                    bottom:30px;
+                    right:30px;
+                    background:#111827;
+                    color:white;
+                    padding:14px 20px;
+                    border-radius:12px;
+                    font-size:14px;
+                    z-index:9999;
+                    box-shadow:0 10px 25px rgba(0,0,0,.25);
+                  "
+                >
+                  ⏳ {{ toast }}
+                </div>
   <div
     style="display:flex; height:100vh; background:#f5f6fa; font-family:'Inter', sans-serif; color:#222;"
   >
@@ -400,14 +448,14 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           </div>
 
           <addSceneModal
-            v-if="showModal"
-            @close="showModal = true"
-            @saveDraft="handleSaveDraft"
-            @publishScene="handlePublishScene"
-            :barangays="barangays"
-            :municipal="municipal"
-            ref="sceneModal"
-          />
+          v-if="showModal"
+          @close="showModal = false"
+          @saveDraft="handleSaveDraft"
+          @publishScene="handlePublishScene"
+          :barangays="barangays"
+          :municipal="municipal"
+          ref="sceneModal"
+        />
         </div>
         <div style="margin:10px 0 0 0; display:flex; gap:10px; padding-left: 5%;">
             <span
@@ -467,11 +515,36 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
         <div
           style="padding:30px 40px; display:flex; flex-flow:row wrap; gap:30px; width:100%; justify-content:left; max-width:1600px; margin:0 auto;"
         >
+       
+
           <div
             v-for="scene in filteredScenes"
             :key="scene.id"
             style="background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px; width:32%; min-width:450px; flex-direction:column; justify-content:space-between;"
           >
+
+           <div v-if="scene.status !== 'done'" style="margin-bottom:8px;">
+                <span
+                  v-if="scene.status === 'queued'"
+                  style="background:#eab308;padding:6px 12px;border-radius:14px;"
+                >
+                  Queued…
+                </span>
+
+                <span
+                  v-if="scene.status === 'processing'"
+                  style="background:#3b82f6;color:white;padding:6px 12px;border-radius:14px;"
+                >
+                  Processing panorama…
+                </span>
+
+                <span
+                  v-if="scene.status === 'failed'"
+                  style="background:#ef4444;color:white;padding:6px 12px;border-radius:14px;"
+                >
+                  Processing failed
+                </span>
+              </div>
             <div style="position:relative;">
               <!-- ✅ Use S3 or local via helper -->
               <div
@@ -579,14 +652,18 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                   />
                   View
                 </button>
+                
               </template>
 
               <!-- Single Scene Buttons -->
               <template v-else>
                 <button
-                  @click="sceneModal && sceneModal.openForEdit(scene)"
-                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
-                >
+                @click="sceneModal && sceneModal.openForEdit(scene)"
+                :disabled="scene.status !== 'done'"
+                :style="scene.status !== 'done'
+                  ? 'opacity:0.5;pointer-events:none'
+                  : ''"
+            >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
                 <button
@@ -596,9 +673,12 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                   <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
                 </button>
                 <button
-                  @click="deleteScene(scene.id)"
-                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; border:none; color:#fff; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
-                >
+  @click="deleteScene(scene.id)"
+  :disabled="scene.status !== 'done'"
+  :style="scene.status !== 'done'
+    ? 'opacity:0.5;pointer-events:none'
+    : ''"
+>
                   <img src="/images/delete_trash.png" style="width:15px; height:15px;" /> Delete
                 </button>
               </template>
@@ -743,7 +823,6 @@ const activeBtn = {
   backgroundColor: "#1e293b",
 };
 </script>
-
 <style scoped>
 ::-webkit-scrollbar {
   width: 8px;

@@ -231,7 +231,6 @@ watch(() => scene.value.existingScene, (val) => {
 const submitScene = (isPublished) => {
   const formData = new FormData();
 
-  // Title must ALWAYS come from the input
   formData.append("title", scene.value.title);
 
   formData.append("municipal", props.municipal);
@@ -249,7 +248,7 @@ const submitScene = (isPublished) => {
   formData.append("how_to_get_there", scene.value.how_to_get_there || "");
   formData.append("is_published", isPublished ? "true" : "false");
 
-  if (scene.value.panorama)
+  if (scene.value.panorama) {
     formData.append("panorama", scene.value.panorama);
   
       closeModal();
@@ -262,6 +261,7 @@ const submitScene = (isPublished) => {
     },
   });
 };
+
 
 const saveDraft = () => submitScene(false);
 const publishScene = () => submitScene(true);
@@ -304,6 +304,7 @@ const updateScene = () => {
 </script>
 
 <template>
+  
   <!-- OPEN MODAL BUTTON -->
   <button
     @click="openModal"
