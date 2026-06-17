@@ -630,8 +630,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               <template v-else>
                 <button
                   @click="sceneModal && sceneModal.openForEdit(scene)"
-                  :disabled="['queued','processing'].includes(scene.status)"
-                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${['queued','processing'].includes(scene.status) ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
                 >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
@@ -643,8 +642,7 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 </button>
                 <button
                   @click="deleteScene(scene.id)"
-                  :disabled="['queued','processing'].includes(scene.status)"
-                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${['queued','processing'].includes(scene.status) ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
                 >
                   <img src="/images/delete_trash.png" style="width:15px; height:15px;" /> Delete
                 </button>
