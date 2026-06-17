@@ -448,7 +448,6 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
           </div>
 
           <addSceneModal
-          v-if="showModal"
           @close="showModal = false"
           @saveDraft="handleSaveDraft"
           @publishScene="handlePublishScene"
@@ -503,12 +502,6 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               {{ activeGroupCount }} Scenes
             </p>
           </div>
-          <addSceneModal
-            v-if="showModal"
-            @close="showModal = true"
-            @saveDraft="handleSaveDraft"
-            @publishScene="handlePublishScene"
-          />
         </div>
 
         <!-- Scene Cards -->
@@ -637,8 +630,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               <template v-else>
                 <button
                   @click="sceneModal && sceneModal.openForEdit(scene)"
-                  :disabled="scene.status !== 'done'"
-                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${scene.status !== 'done' ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                  :disabled="['queued','processing'].includes(scene.status)"
+                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${['queued','processing'].includes(scene.status) ? 'opacity:0.5;pointer-events:none;' : ''}`"
                 >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
@@ -650,8 +643,8 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
                 </button>
                 <button
                   @click="deleteScene(scene.id)"
-                  :disabled="scene.status !== 'done'"
-                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${scene.status !== 'done' ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                  :disabled="['queued','processing'].includes(scene.status)"
+                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${['queued','processing'].includes(scene.status) ? 'opacity:0.5;pointer-events:none;' : ''}`"
                 >
                   <img src="/images/delete_trash.png" style="width:15px; height:15px;" /> Delete
                 </button>

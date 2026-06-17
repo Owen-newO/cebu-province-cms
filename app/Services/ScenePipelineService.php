@@ -1059,6 +1059,7 @@ private function appendDirectionsToXml(string $howToGetThere, string $title, str
     $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
     $safeTitle       = htmlspecialchars($title, ENT_QUOTES);
     $displayText     = $howToGetThere ?: 'How to get here will be added soon.';
+    $displayText     = str_replace(["\r\n", "\r", "\n"], "<br/>", $displayText);
     $safeText        = htmlspecialchars($displayText, ENT_QUOTES);
 
     $block = "
