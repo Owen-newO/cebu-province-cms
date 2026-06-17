@@ -636,27 +636,23 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
               <!-- Single Scene Buttons -->
               <template v-else>
                 <button
-                @click="sceneModal && sceneModal.openForEdit(scene)"
-                :disabled="scene.status !== 'done'"
-                :style="scene.status !== 'done'
-                  ? 'opacity:0.5;pointer-events:none'
-                  : ''"
-            >
+                  @click="sceneModal && sceneModal.openForEdit(scene)"
+                  :disabled="scene.status !== 'done'"
+                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${scene.status !== 'done' ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                >
                   <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
                 </button>
                 <button
-                @click="handleView(scene)"
-                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                  @click="handleView(scene)"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#2383E2; color:#fff; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
                 >
                   <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
                 </button>
                 <button
-  @click="deleteScene(scene.id)"
-  :disabled="scene.status !== 'done'"
-  :style="scene.status !== 'done'
-    ? 'opacity:0.5;pointer-events:none'
-    : ''"
->
+                  @click="deleteScene(scene.id)"
+                  :disabled="scene.status !== 'done'"
+                  :style="`flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;${scene.status !== 'done' ? 'opacity:0.5;pointer-events:none;' : ''}`"
+                >
                   <img src="/images/delete_trash.png" style="width:15px; height:15px;" /> Delete
                 </button>
               </template>
