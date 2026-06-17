@@ -219,7 +219,7 @@ class SceneController extends Controller
         'location'        => 'nullable|string|max:255',
         'barangay'        => 'nullable|string|max:255',
         'category'        => 'nullable|string|max:255',
-        'address'         => 'nullable|string|max:5000',
+        'address'         => 'nullable|string',
         'google_map_link' => 'nullable|string',
         'contact_number'  => 'nullable|string|max:255',
         'email'           => 'nullable|string|max:255',
