@@ -108,5 +108,54 @@ class UserSeeder extends Seeder
                 'role' => 'danao',
             ]
         );
+        User::updateOrCreate(
+            ['email' => 'balamban@mata.cms'],
+            [
+                'name' => 'Balamban',
+                'password' => Hash::make('balambanadmin'),
+                'role' => 'balamban',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'daanbantayan@mata.cms'],
+            [
+                'name' => 'Daanbantayan',
+                'password' => Hash::make('daanbantayanadmin'),
+                'role' => 'daanbantayan',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'medellin@mata.cms'],
+            [
+                'name' => 'Medellin',
+                'password' => Hash::make('medellinadmin'),
+                'role' => 'medellin',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'bantayan@mata.cms'],
+            [
+                'name' => 'Bantayan',
+                'password' => Hash::make('bantayanadmin'),
+                'role' => 'bantayan',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'santafe@mata.cms'],
+            [
+                'name' => 'Santafe',
+                'password' => Hash::make('santafeadmin'),
+                'role' => 'santafe',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'madridejos@mata.cms'],
+            [
+                'name' => 'Madridejos',
+                'password' => Hash::make('madridejosadmin'),
+                'role' => 'madridejos',
+            ]
+        );
+
     }
 }
