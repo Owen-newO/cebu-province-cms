@@ -1164,6 +1164,14 @@ class SceneController extends Controller
     // ✅ use slug
     $pipeline->setPublishedFlag($sceneId, $municipalSlug, true);
 
+    // Re-inject "How to Get There" directions from the scene's stored value,
+    // so publishing always applies the current CMS text (not a stale placeholder).
+    $pipeline->updateDirections($sceneId, $municipalSlug, [
+        'how_to_get_there' => $scene->how_to_get_there ?? '',
+        'title'            => $scene->title ?? '',
+        'is_published'     => 1,
+    ]);
+
     return back()->with('success', 'Published. Scene is now visible.');
 }
 
