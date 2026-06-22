@@ -156,6 +156,78 @@ class UserSeeder extends Seeder
                 'role' => 'madridejos',
             ]
         );
+        User::updateOrCreate(
+            ['email' => 'badian@mata.cms'],
+            [
+                'name' => 'Badian',
+                'password' => Hash::make('badianadmin'),
+                'role' => 'badian',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'dumanjug@mata.cms'],
+            [
+                'name' => 'Dumanjug',
+                'password' => Hash::make('dumanjugadmin'),
+                'role' => 'dumanjug',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'malabuyoc@mata.cms'],
+            [
+                'name' => 'Malabuyoc',
+                'password' => Hash::make('malabuyocadmin'),
+                'role' => 'malabuyoc',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'alcoy@mata.cms'],
+            [
+                'name' => 'Alcoy',
+                'password' => Hash::make('alcoyadmin'),
+                'role' => 'alcoy',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'dalaguete@mata.cms'],
+            [
+                'name' => 'Dalaguete',
+                'password' => Hash::make('dalagueteadmin'),
+                'role' => 'dalaguete',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'argao@mata.cms'],
+            [
+                'name' => 'Argao',
+                'password' => Hash::make('argaoadmin'),
+                'role' => 'argao',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'barili@mata.cms'],
+            [
+                'name' => 'Barili',
+                'password' => Hash::make('bariliadmin'),
+                'role' => 'barili',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'naga@mata.cms'],
+            [
+                'name' => 'Naga',
+                'password' => Hash::make('nagaadmin'),
+                'role' => 'naga',
+            ]
+        );
+        User::updateOrCreate(
+            ['email' => 'cordova@mata.cms'],
+            [
+                'name' => 'Cordova',
+                'password' => Hash::make('cordovaadmin'),
+                'role' => 'cordova',
+            ]
+        );
 
     }
 }
