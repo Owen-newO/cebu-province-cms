@@ -663,4 +663,27 @@ return [
         "Barangay Tugas",
     ],
 
+    'daanbantayan' => [
+        "Barangay Aguho",
+        "Barangay Bagay",
+        "Barangay Bakhawan",
+        "Barangay Bateria",
+        "Barangay Bitoon",
+        "Barangay Calape",
+        "Barangay Carnaza",
+        "Barangay Dalingding",
+        "Barangay Lanao",
+        "Barangay Logon",
+        "Barangay Malbago",
+        "Barangay Malingin",
+        "Barangay Maya",
+        "Barangay Pajo",
+        "Barangay Paypay",
+        "Barangay Poblacion",
+        "Barangay Talisay",
+        "Barangay Tapilon",
+        "Barangay Tinubdan",
+        "Barangay Tominjao",
+    ],
+
 ];
