@@ -686,4 +686,26 @@ return [
         "Barangay Tominjao",
     ],
 
+    'medellin' => [
+        "Barangay Antipolo",
+        "Barangay Canhabagat",
+        "Barangay Caputatan Norte",
+        "Barangay Caputatan Sur",
+        "Barangay Curva",
+        "Barangay Daanlungsod",
+        "Barangay Dalingding Sur",
+        "Barangay Dayhagon",
+        "Barangay Don Virgilio Gonzales",
+        "Barangay Gibitngil",
+        "Barangay Kawit",
+        "Barangay Lamintak Norte",
+        "Barangay Lamintak Sur",
+        "Barangay Luy-a",
+        "Barangay Maharuhay",
+        "Barangay Mahawak",
+        "Barangay Panugnawan",
+        "Barangay Poblacion",
+        "Barangay Tindog",
+    ],
+
 ];
