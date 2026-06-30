@@ -644,6 +644,8 @@ return [
         "Barangay Balidbid",
         "Barangay Pooc",
         "Barangay Talisay",
+        "Barangay Virgin Island",
+        "Barangay Talisay",
     ],
 
     'madridejos' => [
