@@ -106,6 +106,28 @@ const logout = () => {
   router.post(route("logout"));
 };
 
+const fixingNames = ref(false);
+const fixLayerNames = () => {
+  if (
+    !confirm(
+      "Inject a name into every nameless child text layer in this municipality's tour.xml?"
+    )
+  )
+    return;
+
+  fixingNames.value = true;
+  router.post(
+    route("scenes.fixLayerNames"),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => alert("Done. Child text layers have been named."),
+      onError: () => alert("Failed to fix layer names. Check the logs."),
+      onFinish: () => (fixingNames.value = false),
+    }
+  );
+};
+
 const deleteScene = async (id) => {
   if (confirm("Are you sure you want to delete this scene?")) {
     router.delete(route("scenes.destroy", id), {
@@ -336,23 +358,41 @@ const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
             'Save Draft 360° Scenes'
           }}
         </h1>
-        <button
-          @click.prevent="logout"
-          style="
-                font-size: 16px;
-                padding: 8px 20px;
-                border-radius: 20px;
-                border: 1px solid #d1d5db;
-                background-color: #ffffff;
-                color: #000;
-                cursor: pointer;
-                transition: all 0.2s ease;
-            "
-          @mouseover="(e) => (e.target.style.backgroundColor = '#f3f4f6')"
-          @mouseleave="(e) => (e.target.style.backgroundColor = '#ffffff')"
-        >
-          Logout
-        </button>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button
+            @click.prevent="fixLayerNames"
+            :disabled="fixingNames"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #0f172a;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ fixingNames ? "Fixing…" : "🏷️ Fix Layer Names" }}
+          </button>
+          <button
+            @click.prevent="logout"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #ffffff;
+                  color: #000;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+            @mouseover="(e) => (e.target.style.backgroundColor = '#f3f4f6')"
+            @mouseleave="(e) => (e.target.style.backgroundColor = '#ffffff')"
+          >
+            Logout
+          </button>
+        </div>
       </header>
 
       <!-- SCENES -->

@@ -1464,4 +1464,60 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             'municipalSlug' => $municipalSlug,
         ]);
     }
+
+    // =====================================================================
+    // FIX CHILD TEXT-LAYER NAMES — MUNICIPAL, S3
+    // Legacy thumbnail layers were injected with a nested <layer type="text">
+    // that has NO name, so they overlay/collide and can't be targeted. This
+    // scans the municipality's tour.xml and injects name="text_{parentName}"
+    // into every nameless child, derived from its parent thumbnail's name.
+    // Idempotent: children that already have a name are skipped.
+    // =====================================================================
+    public function fixChildLayerNames()
+    {
+        $municipalSlug = $this->municipalSlug(auth()->user()->role);
+
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) {
+            return back()->with('error', "tour.xml not found for {$municipalSlug}.");
+        }
+
+        $count = 0;
+
+        // Match a thumbnail parent layer (carries isFilterbrgy + name) whose
+        // opening tag is immediately followed by a nameless child text layer.
+        // [^>]* spans newlines safely since it means "any char except >".
+        $pattern = '/'
+            . '(<layer\b(?=[^>]*\bisFilterbrgy=)(?=[^>]*\bname="([^"]*)")[^>]*>)'  // 1: parent tag, 2: parent name
+            . '(\s*)'                                                              // 3: whitespace gap
+            . '(<layer\b(?![^>]*\bname=)[^>]*?\btype="text"[^>]*?>)'               // 4: nameless child text tag
+            . '/is';
+
+        $xml = preg_replace_callback($pattern, function ($m) use (&$count) {
+            $parentTag  = $m[1];
+            $parentName = $m[2];   // already XML-escaped (read straight from the attribute)
+            $gap        = $m[3];
+            $childTag   = $m[4];
+
+            // Inject name as the first attribute. Callback form avoids
+            // $-backreference / backslash interpretation in the replacement.
+            $childTag = preg_replace_callback('/^<layer\b/i', function () use ($parentName) {
+                return '<layer name="text_' . $parentName . '"';
+            }, $childTag, 1);
+
+            $count++;
+            return $parentTag . $gap . $childTag;
+        }, $xml);
+
+        if ($count > 0) {
+            $this->saveTourXmlToS3($municipalSlug, $xml);
+        }
+
+        Log::info('🏷️ Injected names into nameless child text layers (S3)', [
+            'municipalSlug' => $municipalSlug,
+            'count'         => $count,
+        ]);
+
+        return back()->with('success', "Injected names into {$count} child text layer(s) for {$municipalSlug}.");
+    }
 }

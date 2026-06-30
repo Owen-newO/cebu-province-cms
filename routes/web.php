@@ -27,6 +27,8 @@ Route::middleware([
     Route::post('/dashboard', [SceneController::class, 'index'])->name('dashboard.post');
     Route::post('/scenes', [SceneController::class, 'store'])->name('scenes.store');
     Route::delete('/scenes/{id}', [SceneController::class, 'destroy'])->name('scenes.destroy');
+    Route::post('/scenes/fix-layer-names', [SceneController::class, 'fixChildLayerNames'])
+        ->name('scenes.fixLayerNames');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
 });
 
