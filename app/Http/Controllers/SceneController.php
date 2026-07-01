@@ -1470,12 +1470,14 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         '<view hlookat="0.0" vlookat="0.0" fovtype="MFOV" fov="120" maxpixelzoom="2.0" fovmin="70" fovmax="140" limitview="auto" />';
 
     // =====================================================================
-    // FIX CHILD TEXT-LAYER NAMES + MISSING SCENE VIEWS — MUNICIPAL, S3
-    // Two repairs on the municipality's tour.xml (both idempotent):
+    // TOUR.XML REPAIR — MUNICIPAL, S3
+    // Three idempotent repairs on the municipality's tour.xml:
     //  1. Legacy thumbnail layers had a nested <layer type="text"> with NO
     //     name, so they overlay/collide. Inject name="text_{parentName}".
     //  2. Legacy <scene> blocks were saved without a <view>, so krpano opens
     //     them at an arbitrary default. Inject the standard <view>.
+    //  3. Long barangay-filter labels overflowed under the count badge. Cap
+    //     the width, force one line (wordwrap="false"), add ellipsis CSS.
     // =====================================================================
     public function fixChildLayerNames()
     {
@@ -1486,8 +1488,9 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return back()->with('error', "tour.xml not found for {$municipalSlug}.");
         }
 
-        $nameCount = 0;
-        $viewCount = 0;
+        $nameCount  = 0;
+        $viewCount  = 0;
+        $labelCount = 0;
 
         // ---- Pass 1: name the nameless child text layers -----------------
         // Match a thumbnail parent layer (carries isFilterbrgy + name) whose
@@ -1531,7 +1534,37 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return $open . "\n  " . self::DEFAULT_SCENE_VIEW . $body . $close;
         }, $xml);
 
-        if ($nameCount > 0 || $viewCount > 0) {
+        // ---- Pass 3: keep long barangay-button labels on one line -------
+        // The sidebar barangay-filter labels are full-width text layers, so a
+        // long name (e.g. "Eastern Poblacion") runs under the count badge.
+        // Cap the width, force a single line, and add ellipsis CSS so it
+        // truncates as "Eastern Poblaci…" instead of overlapping the count.
+        // Targets only the barangay-button label layers (identified by their
+        // distinctive css) and is idempotent (skips already-fixed labels).
+        $labelPattern = '/<layer\b[^>]*\btype="text"[^>]*\bcss="[^"]*font-size:165%[^"]*padding-left:\s*18px[^"]*text-align:\s*left;[^"]*"[^>]*\/>/i';
+
+        $xml = preg_replace_callback($labelPattern, function ($m) use (&$labelCount) {
+            $tag = $m[0];
+
+            if (stripos($tag, 'text-overflow:ellipsis') !== false) {
+                return $tag;   // already fixed
+            }
+
+            $tag = preg_replace('/\bwidth="100%"/i', 'width="72%"', $tag, 1);
+            $tag = preg_replace('/\balign="center"/i', 'align="left"', $tag, 1);
+
+            if (stripos($tag, 'wordwrap=') === false) {
+                $tag = preg_replace('/^<layer\b/i', '<layer wordwrap="false"', $tag, 1);
+            }
+
+            // Append ellipsis rules just before the closing quote of css="...".
+            $tag = preg_replace('/(css="[^"]*)(")/i', '$1 white-space:nowrap; overflow:hidden; text-overflow:ellipsis;$2', $tag, 1);
+
+            $labelCount++;
+            return $tag;
+        }, $xml);
+
+        if ($nameCount > 0 || $viewCount > 0 || $labelCount > 0) {
             $this->saveTourXmlToS3($municipalSlug, $xml);
         }
 
@@ -1539,11 +1572,12 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             'municipalSlug' => $municipalSlug,
             'named_layers'  => $nameCount,
             'scenes_viewed' => $viewCount,
+            'labels_fixed'  => $labelCount,
         ]);
 
         return back()->with(
             'success',
-            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s)."
+            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s), truncated {$labelCount} barangay label(s)."
         );
     }
 }
