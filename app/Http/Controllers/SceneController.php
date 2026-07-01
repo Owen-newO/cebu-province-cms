@@ -459,7 +459,7 @@ class SceneController extends Controller
 
         $newScene = "
 <scene name=\"scene_{$sceneId}\" title=\"{$title}\" subtitle=\"{$subtitle}\" onstart=\"filterLayersByPlace\" places=\"{$title}\" thumburl=\"{$thumb}\">
-  <view hlookat=\"0\" vlookat=\"0\" fovtype=\"MFOV\" fov=\"120\" maxpixelzoom=\"2.0\" fovmin=\"70\" fovmax=\"140\" limitview=\"auto\" />
+  <view hlookat=\"0.0\" vlookat=\"0.0\" fovtype=\"MFOV\" fov=\"120\" maxpixelzoom=\"2.0\" fovmin=\"70\" fovmax=\"140\" limitview=\"auto\" />
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
@@ -1465,13 +1465,17 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         ]);
     }
 
+    // Standard default view injected into every scene (new uploads + repairs).
+    private const DEFAULT_SCENE_VIEW =
+        '<view hlookat="0.0" vlookat="0.0" fovtype="MFOV" fov="120" maxpixelzoom="2.0" fovmin="70" fovmax="140" limitview="auto" />';
+
     // =====================================================================
-    // FIX CHILD TEXT-LAYER NAMES — MUNICIPAL, S3
-    // Legacy thumbnail layers were injected with a nested <layer type="text">
-    // that has NO name, so they overlay/collide and can't be targeted. This
-    // scans the municipality's tour.xml and injects name="text_{parentName}"
-    // into every nameless child, derived from its parent thumbnail's name.
-    // Idempotent: children that already have a name are skipped.
+    // FIX CHILD TEXT-LAYER NAMES + MISSING SCENE VIEWS — MUNICIPAL, S3
+    // Two repairs on the municipality's tour.xml (both idempotent):
+    //  1. Legacy thumbnail layers had a nested <layer type="text"> with NO
+    //     name, so they overlay/collide. Inject name="text_{parentName}".
+    //  2. Legacy <scene> blocks were saved without a <view>, so krpano opens
+    //     them at an arbitrary default. Inject the standard <view>.
     // =====================================================================
     public function fixChildLayerNames()
     {
@@ -1482,8 +1486,10 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return back()->with('error', "tour.xml not found for {$municipalSlug}.");
         }
 
-        $count = 0;
+        $nameCount = 0;
+        $viewCount = 0;
 
+        // ---- Pass 1: name the nameless child text layers -----------------
         // Match a thumbnail parent layer (carries isFilterbrgy + name) whose
         // opening tag is immediately followed by a nameless child text layer.
         // [^>]* spans newlines safely since it means "any char except >".
@@ -1493,7 +1499,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             . '(<layer\b(?![^>]*\bname=)[^>]*?\btype="text"[^>]*?>)'               // 4: nameless child text tag
             . '/is';
 
-        $xml = preg_replace_callback($pattern, function ($m) use (&$count) {
+        $xml = preg_replace_callback($pattern, function ($m) use (&$nameCount) {
             $parentTag  = $m[1];
             $parentName = $m[2];   // already XML-escaped (read straight from the attribute)
             $gap        = $m[3];
@@ -1505,19 +1511,39 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 return '<layer name="text_' . $parentName . '"';
             }, $childTag, 1);
 
-            $count++;
+            $nameCount++;
             return $parentTag . $gap . $childTag;
         }, $xml);
 
-        if ($count > 0) {
+        // ---- Pass 2: add a <view> to any scene missing one --------------
+        // Match each full <scene ...>...</scene> block. If its body has no
+        // <view>, inject the standard view right after the opening tag.
+        $xml = preg_replace_callback('/(<scene\b[^>]*>)(.*?)(<\/scene>)/is', function ($m) use (&$viewCount) {
+            $open  = $m[1];
+            $body  = $m[2];
+            $close = $m[3];
+
+            if (stripos($body, '<view') !== false) {
+                return $m[0];   // already has a view — leave untouched
+            }
+
+            $viewCount++;
+            return $open . "\n  " . self::DEFAULT_SCENE_VIEW . $body . $close;
+        }, $xml);
+
+        if ($nameCount > 0 || $viewCount > 0) {
             $this->saveTourXmlToS3($municipalSlug, $xml);
         }
 
-        Log::info('🏷️ Injected names into nameless child text layers (S3)', [
+        Log::info('🛠️ tour.xml repair pass (S3)', [
             'municipalSlug' => $municipalSlug,
-            'count'         => $count,
+            'named_layers'  => $nameCount,
+            'scenes_viewed' => $viewCount,
         ]);
 
-        return back()->with('success', "Injected names into {$count} child text layer(s) for {$municipalSlug}.");
+        return back()->with(
+            'success',
+            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s)."
+        );
     }
 }

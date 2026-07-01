@@ -621,7 +621,7 @@ return [
         "Barangay Lipayran",
         "Barangay Luyongbaybay",
         "Barangay Mojon",
-        "Barangay Obo-ob",
+        "Barangay Oboob",
         "Barangay Patao",
         "Barangay Putian",
         "Barangay Sillon",
