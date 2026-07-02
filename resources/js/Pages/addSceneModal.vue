@@ -10,7 +10,15 @@ const props = defineProps({
   municipal: String,
 });
 
-const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
+const categories = [
+  "Beach & Water",
+  "Adventure & Nature",
+  "Food & Cuisine",
+  "Culture & Heritage",
+  "Health & Wellness",
+  "Festival & Fiesta",
+  "Business & Investment",
+];
 
 const showModal = ref(false);
 const existingScenes = ref([]);
@@ -229,6 +237,12 @@ watch(() => scene.value.existingScene, (val) => {
 // Submit create
 // -----------------------------------------------------------
 const submitScene = (isPublished) => {
+  if (!scene.value.category) {
+    alert("Please select a Category.");
+    activeTab.value = "info";
+    return;
+  }
+
   const formData = new FormData();
 
   formData.append("title", scene.value.title);
@@ -271,6 +285,12 @@ const publishScene = () => submitScene(true);
 // -----------------------------------------------------------
 const updateScene = () => {
   if (!editingId.value) return;
+
+  if (!scene.value.category) {
+    alert("Please select a Category.");
+    activeTab.value = "info";
+    return;
+  }
 
   const formData = new FormData();
   formData.append("_method", "PUT");
@@ -481,7 +501,7 @@ const updateScene = () => {
 
           <!-- CATEGORY -->
           <div>
-            <label style="font-size:15px;font-weight:600;">Category</label>
+            <label style="font-size:15px;font-weight:600;">Category <span style="color:#dc2626;">*</span></label>
 <select
   v-model="scene.category"
   :disabled="isUsingExisting"

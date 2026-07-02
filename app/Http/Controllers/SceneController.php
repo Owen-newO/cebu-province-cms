@@ -219,7 +219,7 @@ class SceneController extends Controller
         'municipal'       => 'required|string|max:255',
         'location'        => 'nullable|string|max:255',
         'barangay'        => 'nullable|string|max:255',
-        'category'        => 'nullable|string|max:255',
+        'category'        => 'required|string|max:255',
         'address'         => 'nullable|string',
         'google_map_link' => 'nullable|string',
         'contact_number'  => 'nullable|string|max:255',
@@ -482,7 +482,7 @@ class SceneController extends Controller
         ]);
 
         // LAYER + META INJECTIONS (municipality-aware on S3)
-        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug);
+        $this->appendLayerToXml($sceneId, $validated['title'], $validated['barangay'] ?? '', $thumb, $municipalSlug, $validated['category'] ?? '');
         $this->appendMapToSideMapLayerXml(
             $validated['google_map_link'] ?? null,
             $validated['title'] ?? '',
@@ -563,22 +563,23 @@ class SceneController extends Controller
     // =====================================================================
     // LAYER INJECTION SA THUMBS (MUNICIPAL-AWARE, S3)
     // =====================================================================
-    private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug)
+    private function appendLayerToXml($sceneId, $sceneTitle, $barangay, $thumb, $municipalSlug, $category = '')
     {
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
         $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $safeCategory = htmlspecialchars($category, ENT_QUOTES);
 
 
         $layer = "
-<layer name=\"{$safeTitle}\" 
-    url=\"{$thumb}\" 
-    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
-    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
-    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\" 
-    barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\">
+<layer name=\"{$safeTitle}\"
+    url=\"{$thumb}\"
+    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
+    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
+    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\"
+    barangay=\"{$barangay}\" categories=\"{$safeCategory}\" iscategory=\"true\" enabled=\"true\" onclick=\"navigation();filter_init();\">
     <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\"
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
@@ -1397,9 +1398,11 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 $tag = $setAttr($tag, 'iframeurl', $newMapLink);
 
             } else {
-                // Thumbnail layer: update name + barangay filter attribute
+                // Thumbnail layer: update name + barangay/category filter attributes
                 $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
+                $tag = $setAttr($tag, 'categories', $newCategory);
+                $tag = $setAttr($tag, 'iscategory', 'true');
             }
 
             return $tag;

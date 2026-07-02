@@ -279,7 +279,15 @@ const handleSaveDraft = (draftScene) => {
 };
 
 // ✅ Barangays and Categories
-const categories = ["Tourist Spot", "Accommodation & Restaurant", "Others"];
+const categories = [
+  "Beach & Water",
+  "Adventure & Nature",
+  "Food & Cuisine",
+  "Culture & Heritage",
+  "Health & Wellness",
+  "Festival & Fiesta",
+  "Business & Investment",
+];
 </script>
 
 <template>
