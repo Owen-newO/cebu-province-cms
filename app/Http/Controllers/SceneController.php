@@ -572,6 +572,9 @@ class SceneController extends Controller
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
         $safeCategory = htmlspecialchars($category, ENT_QUOTES);
 
+        // Only flag the layer as category-filterable when a category was chosen.
+        $isCategoryAttr = trim($category) !== '' ? ' iscategory="true"' : '';
+
 
         $layer = "
 <layer name=\"{$safeTitle}\"
@@ -579,7 +582,7 @@ class SceneController extends Controller
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
     keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\"
-    barangay=\"{$barangay}\" categories=\"{$safeCategory}\" iscategory=\"true\" enabled=\"true\" onclick=\"navigation();filter_init();\">
+    barangay=\"{$barangay}\" categories=\"{$safeCategory}\"{$isCategoryAttr} enabled=\"true\" onclick=\"navigation();filter_init();\">
     <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\"
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
@@ -1402,7 +1405,9 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
                 $tag = $setAttr($tag, 'categories', $newCategory);
-                $tag = $setAttr($tag, 'iscategory', 'true');
+                if (trim($newCategory) !== '') {
+                    $tag = $setAttr($tag, 'iscategory', 'true');
+                }
             }
 
             return $tag;
