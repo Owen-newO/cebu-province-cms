@@ -1365,23 +1365,18 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 $tag = $setAttr($tag, 'text', $newBarangay);
 
             } elseif (strpos($layerName, 'category_text_') === 0) {
-                $tag = $renameName($tag, 'category_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newCategory);
 
             } elseif (strpos($layerName, 'details_text_') === 0) {
-                $tag = $renameName($tag, 'details_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newAddress);
 
             } elseif (strpos($layerName, 'number_text_') === 0) {
-                $tag = $renameName($tag, 'number_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newPhone);
 
             } elseif (strpos($layerName, 'email_text_') === 0) {
-                $tag = $renameName($tag, 'email_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newEmail);
 
             } elseif (strpos($layerName, 'title_text_') === 0) {
-                $tag = $renameName($tag, 'Title_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newTitle);
 
             } elseif (strpos($layerName, 'website_text_') === 0) {
@@ -1413,12 +1408,11 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 );
 
             } elseif (strpos($layerName, 'iframelayer_') === 0) {
-                $tag = $renameName($tag, 'iframeLayer_' . $newTitle);
                 $tag = $setAttr($tag, 'iframeurl', $newMapLink);
 
             } else {
                 // Thumbnail layer: update name + barangay/category filter attributes
-                $tag = $renameName($tag, $newTitle);
+                $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
                 $tag = $setAttr($tag, 'categories', $newCategory);
                 if (trim($newCategory) !== '') {
