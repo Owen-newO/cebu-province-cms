@@ -1313,10 +1313,6 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return;
         }
 
-        // Escaped old title, so we can find it inside layer names and swap it
-        // for the new title (names are stored HTML-escaped, same as injection).
-        $oldTitleEsc = htmlspecialchars($oldTitle, ENT_QUOTES);
-
         $newTitle     = htmlspecialchars($validated['title']          ?? '', ENT_QUOTES);
         $newBarangay  = htmlspecialchars($validated['barangay']        ?? '', ENT_QUOTES);
         $newCategory  = htmlspecialchars($validated['category']        ?? '', ENT_QUOTES);
@@ -1347,110 +1343,113 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         // [^>]* safely spans newlines since it means "any char except >"
         $pattern = '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*(\/?>)/i';
 
+        // set (or add) the name attribute; callback form avoids $/backslash issues
+        $setName = function (string $t, string $name): string {
+            if (preg_match('/\bname="[^"]*"/i', $t)) {
+                return preg_replace_callback('/\bname="[^"]*"/i', function () use ($name) {
+                    return 'name="' . $name . '"';
+                }, $t, 1);
+            }
+            return preg_replace_callback('/^<layer\b/i', function () use ($name) {
+                return '<layer name="' . $name . '"';
+            }, $t, 1);
+        };
+
         $xmlContent = preg_replace_callback($pattern, function ($m) use (
             $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
             $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
-            $newMapLink, $isPublished, $textLabel, $setAttr, $oldTitleEsc
+            $newMapLink, $isPublished, $setAttr, $setName
         ) {
             $tag = $m[0];
 
-            preg_match('/\bname="([^"]*)"/i', $tag, $nm);
-            $currentName = $nm[1] ?? '';
-            $layerName   = strtolower($currentName);
-
-            // Rename: swap the old title for the new one inside this layer's
-            // name (e.g. category_text_{oldTitle} -> category_text_{newTitle},
-            // or the thumbnail's bare name {oldTitle} -> {newTitle}).
-            if ($oldTitleEsc !== '' && $oldTitleEsc !== $newTitle && strpos($currentName, $oldTitleEsc) !== false) {
-                $renamed = str_replace($oldTitleEsc, $newTitle, $currentName);
-                $tag = preg_replace_callback('/\bname="[^"]*"/i', function () use ($renamed) {
-                    return 'name="' . $renamed . '"';
-                }, $tag, 1);
-            }
+            // Identify the layer by its PARENT container (reliable) and whether
+            // it is the thumbnail (isFilterbrgy). Names may be stale, so we
+            // rebuild them from {prefix}{newTitle} instead of trusting them.
+            preg_match('/\bparent="([^"]*)"/i', $tag, $pm);
+            $parent  = strtolower($pm[1] ?? '');
+            $isThumb = (bool) preg_match('/\bisFilterbrgy=/i', $tag);
 
             // Every linked layer gets updated places + ispublished
             $tag = $setAttr($tag, 'places',      $newTitle);
             $tag = $setAttr($tag, 'ispublished', $isPublished);
 
-            if (strpos($layerName, 'barangay_text_') === 0) {
+            if ($isThumb) {
+                // Thumbnail: name is the bare title + barangay/category filters
+                $tag = $setName($tag, $newTitle);
+                $tag = $setAttr($tag, 'barangay', $newBarangay);
+                $tag = $setAttr($tag, 'categories', $newCategory);
+                if (trim($newCategory) !== '') {
+                    $tag = $setAttr($tag, 'iscategory', 'true');
+                }
+
+            } elseif ($parent === 'forbarangay') {
+                $tag = $setName($tag, 'barangay_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newBarangay);
 
-            } elseif (strpos($layerName, 'category_text_') === 0) {
+            } elseif ($parent === 'forcat') {
+                $tag = $setName($tag, 'category_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newCategory);
 
-            } elseif (strpos($layerName, 'details_text_') === 0) {
+            } elseif ($parent === 'scrollarea5') {
+                $tag = $setName($tag, 'details_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newAddress);
 
-            } elseif (strpos($layerName, 'number_text_') === 0) {
+            } elseif ($parent === 'forphone') {
+                $tag = $setName($tag, 'number_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newPhone);
 
-            } elseif (strpos($layerName, 'email_text_') === 0) {
+            } elseif ($parent === 'formail') {
+                $tag = $setName($tag, 'email_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newEmail);
 
-            } elseif (strpos($layerName, 'title_text_') === 0) {
-                $tag = $setAttr($tag, 'text', $newTitle);
+            } elseif ($parent === 'sidemap') {
+                $tag = $setName($tag, 'iframeLayer_' . $newTitle);
+                $tag = $setAttr($tag, 'iframeurl', $newMapLink);
 
-            } elseif (strpos($layerName, 'website_text_') === 0) {
+            } elseif ($parent === 'forwebsite') {
                 $tag = preg_replace_callback(
                     "/onclick=\"openurl\\('[^']*'\\)\"/i",
                     fn() => "onclick=\"openurl('{$newWebsite}')\"",
                     $tag
                 );
 
-            } elseif (strpos($layerName, 'facebook_text_') === 0) {
+            } elseif ($parent === 'forfb') {
                 $tag = preg_replace_callback(
                     "/onclick=\"openurl\\('[^']*'\\)\"/i",
                     fn() => "onclick=\"openurl('{$newFacebook}')\"",
                     $tag
                 );
 
-            } elseif (strpos($layerName, 'instagram_text_') === 0) {
+            } elseif ($parent === 'forinsta') {
                 $tag = preg_replace_callback(
                     "/onclick=\"openurl\\('[^']*'\\)\"/i",
                     fn() => "onclick=\"openurl('{$newInstagram}')\"",
                     $tag
                 );
 
-            } elseif (strpos($layerName, 'tiktok_text_') === 0) {
+            } elseif ($parent === 'fortiktok') {
                 $tag = preg_replace_callback(
                     "/onclick=\"openurl\\('[^']*'\\)\"/i",
                     fn() => "onclick=\"openurl('{$newTiktok}')\"",
                     $tag
                 );
 
-            } elseif (strpos($layerName, 'iframelayer_') === 0) {
-                $tag = $setAttr($tag, 'iframeurl', $newMapLink);
-
             } else {
-                // Thumbnail layer: update name + barangay/category filter attributes
-                $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
-                $tag = $setAttr($tag, 'barangay', $newBarangay);
-                $tag = $setAttr($tag, 'categories', $newCategory);
-                if (trim($newCategory) !== '') {
-                    $tag = $setAttr($tag, 'iscategory', 'true');
-                }
+                // No parent and not the thumbnail => the Title text layer.
+                $tag = $setName($tag, 'Title_text_' . $newTitle);
+                $tag = $setAttr($tag, 'text', $newTitle);
             }
 
             return $tag;
         }, $xmlContent);
 
-        // Update the visible label nested inside the thumbnail container: rename
-        // its name (old title -> new title) and set its text. Scoped to the
-        // thumbnail (isFilterbrgy) so meta layers aren't touched.
+        // Update the visible label nested inside the thumbnail container: rebuild
+        // its name as text_{newTitle} and set its text. Scoped to the thumbnail
+        // (isFilterbrgy) so meta layers aren't touched.
         $xmlContent = preg_replace_callback(
             '/(<layer\b(?=[^>]*\bisFilterbrgy=)[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*)(<layer\b[^>]*\btype="text"[^>]*?\/?>)/i',
-            function ($m) use ($textLabel, $setAttr, $oldTitleEsc, $newTitle) {
-                $child = $m[2];
-
-                if ($oldTitleEsc !== '' && $oldTitleEsc !== $newTitle
-                    && preg_match('/\bname="([^"]*)"/i', $child, $cn)
-                    && strpos($cn[1], $oldTitleEsc) !== false) {
-                    $renamed = str_replace($oldTitleEsc, $newTitle, $cn[1]);
-                    $child = preg_replace_callback('/\bname="[^"]*"/i', function () use ($renamed) {
-                        return 'name="' . $renamed . '"';
-                    }, $child, 1);
-                }
-
+            function ($m) use ($textLabel, $setAttr, $setName, $newTitle) {
+                $child = $setName($m[2], 'text_' . $newTitle);
                 return $m[1] . $setAttr($child, 'text', $textLabel);
             },
             $xmlContent
