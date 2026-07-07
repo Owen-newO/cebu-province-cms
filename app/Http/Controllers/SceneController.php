@@ -1202,9 +1202,11 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     $municipalSlug = $this->municipalSlug($scene->municipal);
 
     // Shared fields — applied to ALL scenes in the same group (same title + municipal).
+    // title identifies the whole group, so renaming it renames every panorama in it.
     // location and panorama_path are intentionally excluded: each panorama in a group
     // has its own unique image and its own location label (e.g. "Main Entrance View").
     $sharedFields = [
+        'title'            => $validated['title']           ?? $scene->title,
         'barangay'         => $validated['barangay']        ?? '',
         'category'         => $validated['category']        ?? '',
         'address'          => $validated['address']         ?? '',
@@ -1333,6 +1335,14 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return preg_replace('/\s*(\/?>)\s*$/', ' ' . $attr . '="' . $value . '"$1', $tag);
         };
 
+        // Helper: rewrite the layer's name attribute (callback form avoids
+        // $-backreference / backslash issues when the title contains them).
+        $renameName = function (string $tag, string $newName): string {
+            return preg_replace_callback('/\bname="[^"]*"/i', function () use ($newName) {
+                return 'name="' . $newName . '"';
+            }, $tag, 1);
+        };
+
         // Match every opening tag (up to its first > or />) that carries linkedscene for this scene.
         // [^>]* safely spans newlines since it means "any char except >"
         $pattern = '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*(\/?>)/i';
@@ -1340,7 +1350,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         $xmlContent = preg_replace_callback($pattern, function ($m) use (
             $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
             $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
-            $newMapLink, $isPublished, $textLabel, $setAttr
+            $newMapLink, $isPublished, $textLabel, $setAttr, $renameName
         ) {
             $tag = $m[0];
 
@@ -1355,18 +1365,23 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 $tag = $setAttr($tag, 'text', $newBarangay);
 
             } elseif (strpos($layerName, 'category_text_') === 0) {
+                $tag = $renameName($tag, 'category_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newCategory);
 
             } elseif (strpos($layerName, 'details_text_') === 0) {
+                $tag = $renameName($tag, 'details_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newAddress);
 
             } elseif (strpos($layerName, 'number_text_') === 0) {
+                $tag = $renameName($tag, 'number_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newPhone);
 
             } elseif (strpos($layerName, 'email_text_') === 0) {
+                $tag = $renameName($tag, 'email_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newEmail);
 
             } elseif (strpos($layerName, 'title_text_') === 0) {
+                $tag = $renameName($tag, 'Title_text_' . $newTitle);
                 $tag = $setAttr($tag, 'text', $newTitle);
 
             } elseif (strpos($layerName, 'website_text_') === 0) {
@@ -1398,11 +1413,12 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
                 );
 
             } elseif (strpos($layerName, 'iframelayer_') === 0) {
+                $tag = $renameName($tag, 'iframeLayer_' . $newTitle);
                 $tag = $setAttr($tag, 'iframeurl', $newMapLink);
 
             } else {
                 // Thumbnail layer: update name + barangay/category filter attributes
-                $tag = preg_replace('/\bname="[^"]*"/i', 'name="' . $newTitle . '"', $tag, 1);
+                $tag = $renameName($tag, $newTitle);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
                 $tag = $setAttr($tag, 'categories', $newCategory);
                 if (trim($newCategory) !== '') {
@@ -1413,12 +1429,14 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return $tag;
         }, $xmlContent);
 
-        // Update the display text label nested inside the thumbnail container.
-        // That child layer has type="text" and sits directly after the thumbnail's opening >.
+        // Update the display label nested inside the thumbnail container: rename it
+        // to text_{newTitle} and set its visible text. Sits right after the thumbnail's >.
         $xmlContent = preg_replace_callback(
-            '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*(<layer\b[^>]*\btype="text"\b[^>]*\btext=")[^"]*(")/i',
-            function ($m) use ($textLabel) {
-                return str_replace($m[1] . $m[2], $m[1] . $textLabel . $m[2], $m[0]);
+            '/(<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*)(<layer\b[^>]*\btype="text"\b[^>]*?\/?>)/i',
+            function ($m) use ($textLabel, $newTitle, $renameName, $setAttr) {
+                $child = $renameName($m[2], 'text_' . $newTitle);
+                $child = $setAttr($child, 'text', $textLabel);
+                return $m[1] . $child;
             },
             $xmlContent
         );
