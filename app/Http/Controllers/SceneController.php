@@ -583,7 +583,7 @@ class SceneController extends Controller
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
     keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" publish=\"{$publish}\"
     barangay=\"{$barangay}\" categories=\"{$safeCategory}\"{$isCategoryAttr} enabled=\"true\" onclick=\"navigation();filter_init();\">
-    <layer name=\"textni{$safeTitle}\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\"
+    <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\"
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
 </layer>
@@ -1186,6 +1186,10 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 {
     $scene = Scene::findOrFail($id);
 
+    // Remember the title BEFORE the update so we can rename every connected
+    // layer whose name embeds the old title (e.g. category_text_{oldTitle}).
+    $oldTitle = $scene->title;
+
     // validate (note: updating = true)
     $validated = $this->validateScene($request, true);
 
@@ -1249,7 +1253,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
         // Update XML for each scene using its own per-scene values
         $this->updateSceneMetaInXml($groupSceneId, $xmlData, $municipalSlug);
-        $this->updateLayerMetaInXml($groupSceneId, $xmlData, $municipalSlug);
+        $this->updateLayerMetaInXml($groupSceneId, $xmlData, $municipalSlug, $oldTitle);
         $pipeline->updateDirections($groupSceneId, $municipalSlug, $xmlData);
     }
 
@@ -1301,13 +1305,17 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     // =====================================================================
     // UPDATE LAYER META IN XML — ALL LAYERS LINKED TO THIS SCENE
     // =====================================================================
-    private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug): void
+    private function updateLayerMetaInXml(string $sceneId, array $validated, string $municipalSlug, string $oldTitle = ''): void
     {
         $xmlContent = $this->loadTourXmlFromS3($municipalSlug);
         if ($xmlContent === null) {
             Log::error('tour.xml not found when updating layer meta (S3)', ['municipalSlug' => $municipalSlug]);
             return;
         }
+
+        // Escaped old title, so we can find it inside layer names and swap it
+        // for the new title (names are stored HTML-escaped, same as injection).
+        $oldTitleEsc = htmlspecialchars($oldTitle, ENT_QUOTES);
 
         $newTitle     = htmlspecialchars($validated['title']          ?? '', ENT_QUOTES);
         $newBarangay  = htmlspecialchars($validated['barangay']        ?? '', ENT_QUOTES);
@@ -1335,14 +1343,6 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return preg_replace('/\s*(\/?>)\s*$/', ' ' . $attr . '="' . $value . '"$1', $tag);
         };
 
-        // Helper: rewrite the layer's name attribute (callback form avoids
-        // $-backreference / backslash issues when the title contains them).
-        $renameName = function (string $tag, string $newName): string {
-            return preg_replace_callback('/\bname="[^"]*"/i', function () use ($newName) {
-                return 'name="' . $newName . '"';
-            }, $tag, 1);
-        };
-
         // Match every opening tag (up to its first > or />) that carries linkedscene for this scene.
         // [^>]* safely spans newlines since it means "any char except >"
         $pattern = '/<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*(\/?>)/i';
@@ -1350,12 +1350,23 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         $xmlContent = preg_replace_callback($pattern, function ($m) use (
             $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
             $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
-            $newMapLink, $isPublished, $textLabel, $setAttr, $renameName
+            $newMapLink, $isPublished, $textLabel, $setAttr, $oldTitleEsc
         ) {
             $tag = $m[0];
 
             preg_match('/\bname="([^"]*)"/i', $tag, $nm);
-            $layerName = strtolower($nm[1] ?? '');
+            $currentName = $nm[1] ?? '';
+            $layerName   = strtolower($currentName);
+
+            // Rename: swap the old title for the new one inside this layer's
+            // name (e.g. category_text_{oldTitle} -> category_text_{newTitle},
+            // or the thumbnail's bare name {oldTitle} -> {newTitle}).
+            if ($oldTitleEsc !== '' && $oldTitleEsc !== $newTitle && strpos($currentName, $oldTitleEsc) !== false) {
+                $renamed = str_replace($oldTitleEsc, $newTitle, $currentName);
+                $tag = preg_replace_callback('/\bname="[^"]*"/i', function () use ($renamed) {
+                    return 'name="' . $renamed . '"';
+                }, $tag, 1);
+            }
 
             // Every linked layer gets updated places + ispublished
             $tag = $setAttr($tag, 'places',      $newTitle);
@@ -1423,14 +1434,24 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return $tag;
         }, $xmlContent);
 
-        // Update the display label nested inside the thumbnail container: rename it
-        // to textni{newTitle} and set its visible text. Sits right after the thumbnail's >.
+        // Update the visible label nested inside the thumbnail container: rename
+        // its name (old title -> new title) and set its text. Scoped to the
+        // thumbnail (isFilterbrgy) so meta layers aren't touched.
         $xmlContent = preg_replace_callback(
             '/(<layer\b(?=[^>]*\bisFilterbrgy=)[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*)(<layer\b[^>]*\btype="text"[^>]*?\/?>)/i',
-            function ($m) use ($textLabel, $newTitle, $renameName, $setAttr) {
-                $child = $renameName($m[2], 'textni' . $newTitle);
-                $child = $setAttr($child, 'text', $textLabel);
-                return $m[1] . $child;
+            function ($m) use ($textLabel, $setAttr, $oldTitleEsc, $newTitle) {
+                $child = $m[2];
+
+                if ($oldTitleEsc !== '' && $oldTitleEsc !== $newTitle
+                    && preg_match('/\bname="([^"]*)"/i', $child, $cn)
+                    && strpos($cn[1], $oldTitleEsc) !== false) {
+                    $renamed = str_replace($oldTitleEsc, $newTitle, $cn[1]);
+                    $child = preg_replace_callback('/\bname="[^"]*"/i', function () use ($renamed) {
+                        return 'name="' . $renamed . '"';
+                    }, $child, 1);
+                }
+
+                return $m[1] . $setAttr($child, 'text', $textLabel);
             },
             $xmlContent
         );
@@ -1531,7 +1552,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             // Inject name as the first attribute. Callback form avoids
             // $-backreference / backslash interpretation in the replacement.
             $childTag = preg_replace_callback('/^<layer\b/i', function () use ($parentName) {
-                return '<layer name="textni' . $parentName . '"';
+                return '<layer name="text_' . $parentName . '"';
             }, $childTag, 1);
 
             $nameCount++;
