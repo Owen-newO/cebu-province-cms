@@ -1432,7 +1432,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         // Update the display label nested inside the thumbnail container: rename it
         // to text_{newTitle} and set its visible text. Sits right after the thumbnail's >.
         $xmlContent = preg_replace_callback(
-            '/(<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*)(<layer\b[^>]*\btype="text"\b[^>]*?\/?>)/i',
+            '/(<layer\b[^>]*\blinkedscene="scene_' . preg_quote($sceneId, '/') . '"[^>]*>\s*)(<layer\b[^>]*\btype="text"[^>]*?\/?>)/i',
             function ($m) use ($textLabel, $newTitle, $renameName, $setAttr) {
                 $child = $renameName($m[2], 'text_' . $newTitle);
                 $child = $setAttr($child, 'text', $textLabel);
