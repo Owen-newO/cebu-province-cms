@@ -1355,10 +1355,15 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             }, $t, 1);
         };
 
+        // remove an attribute entirely from an opening tag
+        $removeAttr = function (string $t, string $attr): string {
+            return preg_replace('/\s*\b' . preg_quote($attr, '/') . '="[^"]*"/i', '', $t);
+        };
+
         $xmlContent = preg_replace_callback($pattern, function ($m) use (
             $newTitle, $newBarangay, $newCategory, $newAddress, $newPhone,
             $newEmail, $newWebsite, $newFacebook, $newInstagram, $newTiktok,
-            $newMapLink, $isPublished, $setAttr, $setName
+            $newMapLink, $isPublished, $setAttr, $setName, $removeAttr
         ) {
             $tag = $m[0];
 
@@ -1372,6 +1377,11 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             // Every linked layer gets updated places + ispublished
             $tag = $setAttr($tag, 'places',      $newTitle);
             $tag = $setAttr($tag, 'ispublished', $isPublished);
+
+            // categories + iscategory belong ONLY on the thumbnail. Strip them
+            // from every linked layer here; the thumbnail branch re-adds them.
+            $tag = $removeAttr($tag, 'iscategory');
+            $tag = $removeAttr($tag, 'categories');
 
             if ($isThumb) {
                 // Thumbnail: name is the bare title + barangay/category filters
