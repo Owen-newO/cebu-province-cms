@@ -1528,6 +1528,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     //     them at an arbitrary default. Inject the standard <view>.
     //  3. Long barangay-filter labels overflowed under the count badge. Cap
     //     the width, force one line (wordwrap="false"), add ellipsis CSS.
+    //  4. Point every scene <view> to hlookat="180.0" (from "0.0"/"0").
     // =====================================================================
     public function fixChildLayerNames()
     {
@@ -1538,9 +1539,10 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return back()->with('error', "tour.xml not found for {$municipalSlug}.");
         }
 
-        $nameCount  = 0;
-        $viewCount  = 0;
-        $labelCount = 0;
+        $nameCount    = 0;
+        $viewCount    = 0;
+        $labelCount   = 0;
+        $hlookatCount = 0;
 
         // ---- Pass 1: fix each thumbnail's child label --------------------
         // Match a thumbnail parent (carries isFilterbrgy + name) followed by its
@@ -1632,7 +1634,19 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return $tag;
         }, $xml);
 
-        if ($nameCount > 0 || $viewCount > 0 || $labelCount > 0) {
+        // ---- Pass 4: point every scene <view> to hlookat 180 -----------
+        // Change hlookat="0.0" (or "0") to "180.0" inside <view> tags only,
+        // so scene hotspots' hlookat values are left untouched.
+        $xml = preg_replace_callback('/<view\b[^>]*?\/?>/i', function ($m) use (&$hlookatCount) {
+            $tag = $m[0];
+            if (preg_match('/\bhlookat="0(\.0+)?"/i', $tag)) {
+                $tag = preg_replace('/\bhlookat="0(\.0+)?"/i', 'hlookat="180.0"', $tag, 1);
+                $hlookatCount++;
+            }
+            return $tag;
+        }, $xml);
+
+        if ($nameCount > 0 || $viewCount > 0 || $labelCount > 0 || $hlookatCount > 0) {
             $this->saveTourXmlToS3($municipalSlug, $xml);
         }
 
@@ -1641,11 +1655,12 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             'named_layers'  => $nameCount,
             'scenes_viewed' => $viewCount,
             'labels_fixed'  => $labelCount,
+            'views_turned'  => $hlookatCount,
         ]);
 
         return back()->with(
             'success',
-            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s), truncated {$labelCount} barangay label(s)."
+            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s), truncated {$labelCount} barangay label(s), set hlookat=180 on {$hlookatCount} view(s)."
         );
     }
 }
