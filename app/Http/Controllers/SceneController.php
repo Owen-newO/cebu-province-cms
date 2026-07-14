@@ -568,7 +568,7 @@ class SceneController extends Controller
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
-        $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
+        $text = str_replace('_', ' ', $sceneTitle);
         $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
         $safeCategory = htmlspecialchars($category, ENT_QUOTES);
 
@@ -1325,7 +1325,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         $newTiktok    = $validated['tiktok']    ?? '';
         $newMapLink   = htmlspecialchars($validated['google_map_link'] ?? '', ENT_QUOTES);
         $isPublished  = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
-        $textLabel    = ucfirst(strtolower(str_replace('_', ' ', $validated['title'] ?? '')));
+        $textLabel    = str_replace('_', ' ', $validated['title'] ?? '');
 
         // Helper: set or add an attribute on an opening tag (handles both > and />)
         $setAttr = function (string $tag, string $attr, string $value): string {
@@ -1522,8 +1522,8 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     // =====================================================================
     // TOUR.XML REPAIR — MUNICIPAL, S3
     // Three idempotent repairs on the municipality's tour.xml:
-    //  1. Legacy thumbnail layers had a nested <layer type="text"> with NO
-    //     name, so they overlay/collide. Inject name="text_{parentName}".
+    //  1. Fix each thumbnail's child label: ensure name="text_{parentName}"
+    //     and set its visible text to the title with its exact casing.
     //  2. Legacy <scene> blocks were saved without a <view>, so krpano opens
     //     them at an arbitrary default. Inject the standard <view>.
     //  3. Long barangay-filter labels overflowed under the count badge. Cap
@@ -1542,14 +1542,15 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         $viewCount  = 0;
         $labelCount = 0;
 
-        // ---- Pass 1: name the nameless child text layers -----------------
-        // Match a thumbnail parent layer (carries isFilterbrgy + name) whose
-        // opening tag is immediately followed by a nameless child text layer.
-        // [^>]* spans newlines safely since it means "any char except >".
+        // ---- Pass 1: fix each thumbnail's child label --------------------
+        // Match a thumbnail parent (carries isFilterbrgy + name) followed by its
+        // child text layer, then (a) ensure name="text_{parentName}" and
+        // (b) set the visible text to the title with its exact casing (taken
+        // from the parent's name, not lower-cased). [^>]* spans newlines safely.
         $pattern = '/'
             . '(<layer\b(?=[^>]*\bisFilterbrgy=)(?=[^>]*\bname="([^"]*)")[^>]*>)'  // 1: parent tag, 2: parent name
             . '(\s*)'                                                              // 3: whitespace gap
-            . '(<layer\b(?![^>]*\bname=)[^>]*?\btype="text"[^>]*?>)'               // 4: nameless child text tag
+            . '(<layer\b[^>]*?\btype="text"[^>]*?>)'                               // 4: child text tag
             . '/is';
 
         $xml = preg_replace_callback($pattern, function ($m) use (&$nameCount) {
@@ -1557,12 +1558,29 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             $parentName = $m[2];   // already XML-escaped (read straight from the attribute)
             $gap        = $m[3];
             $childTag   = $m[4];
+            $label      = str_replace('_', ' ', $parentName);   // title, casing preserved
 
-            // Inject name as the first attribute. Callback form avoids
-            // $-backreference / backslash interpretation in the replacement.
-            $childTag = preg_replace_callback('/^<layer\b/i', function () use ($parentName) {
-                return '<layer name="text_' . $parentName . '"';
-            }, $childTag, 1);
+            // (a) ensure the child is named text_{parentName}
+            if (preg_match('/\bname="[^"]*"/i', $childTag)) {
+                $childTag = preg_replace_callback('/\bname="[^"]*"/i', function () use ($parentName) {
+                    return 'name="text_' . $parentName . '"';
+                }, $childTag, 1);
+            } else {
+                $childTag = preg_replace_callback('/^<layer\b/i', function () use ($parentName) {
+                    return '<layer name="text_' . $parentName . '"';
+                }, $childTag, 1);
+            }
+
+            // (b) set the visible label text to the correctly-cased title
+            if (preg_match('/\btext="[^"]*"/i', $childTag)) {
+                $childTag = preg_replace_callback('/\btext="[^"]*"/i', function () use ($label) {
+                    return 'text="' . $label . '"';
+                }, $childTag, 1);
+            } else {
+                $childTag = preg_replace_callback('/^<layer\b/i', function () use ($label) {
+                    return '<layer text="' . $label . '"';
+                }, $childTag, 1);
+            }
 
             $nameCount++;
             return $parentTag . $gap . $childTag;
