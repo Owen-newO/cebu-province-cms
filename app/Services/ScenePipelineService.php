@@ -272,8 +272,8 @@ class ScenePipelineService
         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $layer = "
-<layer name=\"{$safeTitle}\" 
-    url=\"{$thumb}\" 
+<layer name=\"lay_{$safeTitle}\"
+    url=\"{$thumb}\"
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
     keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 

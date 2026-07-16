@@ -577,7 +577,7 @@ class SceneController extends Controller
 
 
         $layer = "
-<layer name=\"{$safeTitle}\"
+<layer name=\"lay_{$safeTitle}\"
     url=\"{$thumb}\"
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
@@ -1384,8 +1384,10 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             $tag = $removeAttr($tag, 'categories');
 
             if ($isThumb) {
-                // Thumbnail: name is the bare title + barangay/category filters
-                $tag = $setName($tag, $newTitle);
+                // Thumbnail: name is lay_{title} + barangay/category filters.
+                // The lay_ prefix keeps the layer name valid when the title is
+                // numeric (krpano can't reliably reference a layer named "123").
+                $tag = $setName($tag, 'lay_' . $newTitle);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
                 $tag = $setAttr($tag, 'categories', $newCategory);
                 if (trim($newCategory) !== '') {
@@ -1560,16 +1562,20 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             $parentName = $m[2];   // already XML-escaped (read straight from the attribute)
             $gap        = $m[3];
             $childTag   = $m[4];
-            $label      = str_replace('_', ' ', $parentName);   // title, casing preserved
+            // The thumbnail name is lay_{title} (the lay_ prefix keeps it valid
+            // for numeric titles). Strip it so the child name / label are still
+            // derived from the bare title: text_{title} and "{title}".
+            $baseName   = preg_replace('/^lay_/', '', $parentName);
+            $label      = str_replace('_', ' ', $baseName);   // title, casing preserved
 
-            // (a) ensure the child is named text_{parentName}
+            // (a) ensure the child is named text_{title}
             if (preg_match('/\bname="[^"]*"/i', $childTag)) {
-                $childTag = preg_replace_callback('/\bname="[^"]*"/i', function () use ($parentName) {
-                    return 'name="text_' . $parentName . '"';
+                $childTag = preg_replace_callback('/\bname="[^"]*"/i', function () use ($baseName) {
+                    return 'name="text_' . $baseName . '"';
                 }, $childTag, 1);
             } else {
-                $childTag = preg_replace_callback('/^<layer\b/i', function () use ($parentName) {
-                    return '<layer name="text_' . $parentName . '"';
+                $childTag = preg_replace_callback('/^<layer\b/i', function () use ($baseName) {
+                    return '<layer name="text_' . $baseName . '"';
                 }, $childTag, 1);
             }
 
