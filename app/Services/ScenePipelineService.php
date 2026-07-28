@@ -157,7 +157,13 @@ class ScenePipelineService
             $localPanorama = str_replace('/', '\\', $localPanorama);
         }
 
-        chdir(base_path());
+        // krpano's makepano writes its vtour/ output relative to the current
+        // working directory, and processNewScene looks for it at {tempDir}/vtour
+        // (the input image's own folder). So CWD must be the input's directory,
+        // NOT base_path() — otherwise the build lands in the project root and
+        // the "did not generate vtour/tour.xml" check throws. (Same reason
+        // ProcessPanorama sets its working directory to $tempDir.)
+        chdir(dirname($localPanorama));
 
          $cmd = "\"{$exe}\" makepano -config=\"{$config}\" \"{$localPanorama}\"  -license=\"vUYqPAACoXher8ChuuTQitL9LBF7pkWALVRziNeYXDTHTLnxubIQxl6aXGASDyYG6aFZvHTAvSdbFHnYDzY4nsbBRLABJUAhdnQPqdzK39qSE1kity/Yvg1OowESykbliDlqeWwUfkh7VsqI36JpNTTWi9IS1y3NPaZjDQLPFjx+OG/9vkINyTBcQHcwp32mu5rkVtbDaWAG8D2j9Eh4FxHtOWjAXOd7dYut3lbLjQWARy3N/hI5IdM+4xn7PVWufGNtfgS+xHbg9LSDyR+uV+ZnevMlCY5LC99IBAHNXd2Ry3sH4qOFjaehW7Y=\"";
         
