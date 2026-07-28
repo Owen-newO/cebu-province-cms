@@ -1530,7 +1530,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     //     them at an arbitrary default. Inject the standard <view>.
     //  3. Long barangay-filter labels overflowed under the count badge. Cap
     //     the width, force one line (wordwrap="false"), add ellipsis CSS.
-    //  4. Point every scene <view> to hlookat="180.0" (from "0.0"/"0").
+    // (Scene-view hlookat is handled separately by setSceneViewHlookat180/0.)
     // =====================================================================
     public function fixChildLayerNames()
     {
@@ -1544,7 +1544,6 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         $nameCount    = 0;
         $viewCount    = 0;
         $labelCount   = 0;
-        $hlookatCount = 0;
 
         // ---- Pass 1: fix each thumbnail's child label --------------------
         // Match a thumbnail parent (carries isFilterbrgy + name) followed by its
@@ -1640,19 +1639,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             return $tag;
         }, $xml);
 
-        // ---- Pass 4: point every scene <view> to hlookat 180 -----------
-        // Change hlookat="0.0" (or "0") to "180.0" inside <view> tags only,
-        // so scene hotspots' hlookat values are left untouched.
-        $xml = preg_replace_callback('/<view\b[^>]*?\/?>/i', function ($m) use (&$hlookatCount) {
-            $tag = $m[0];
-            if (preg_match('/\bhlookat="0(\.0+)?"/i', $tag)) {
-                $tag = preg_replace('/\bhlookat="0(\.0+)?"/i', 'hlookat="180.0"', $tag, 1);
-                $hlookatCount++;
-            }
-            return $tag;
-        }, $xml);
-
-        if ($nameCount > 0 || $viewCount > 0 || $labelCount > 0 || $hlookatCount > 0) {
+        if ($nameCount > 0 || $viewCount > 0 || $labelCount > 0) {
             $this->saveTourXmlToS3($municipalSlug, $xml);
         }
 
@@ -1661,12 +1648,63 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             'named_layers'  => $nameCount,
             'scenes_viewed' => $viewCount,
             'labels_fixed'  => $labelCount,
-            'views_turned'  => $hlookatCount,
         ]);
 
         return back()->with(
             'success',
-            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s), truncated {$labelCount} barangay label(s), set hlookat=180 on {$hlookatCount} view(s)."
+            "Repaired {$municipalSlug}: named {$nameCount} child text layer(s), added <view> to {$viewCount} scene(s), truncated {$labelCount} barangay label(s)."
+        );
+    }
+
+    // =====================================================================
+    // SCENE VIEW HLOOKAT — TOGGLE BETWEEN 0 AND 180 (MUNICIPAL-AWARE, S3)
+    // =====================================================================
+    // Two standalone actions (no longer part of the Fix Layer Names repair):
+    //  - setSceneViewHlookat180(): turn every scene <view> hlookat from 0 → 180
+    //  - setSceneViewHlookat0():   turn every scene <view> hlookat from 180 → 0
+    // Only <view> tags are touched, so hotspot hlookat values are left alone.
+    public function setSceneViewHlookat180()
+    {
+        return $this->applySceneViewHlookat('/\bhlookat="0(\.0+)?"/i', '180.0');
+    }
+
+    public function setSceneViewHlookat0()
+    {
+        return $this->applySceneViewHlookat('/\bhlookat="180(\.0+)?"/i', '0.0');
+    }
+
+    private function applySceneViewHlookat(string $fromRegex, string $toValue)
+    {
+        $municipalSlug = $this->municipalSlug(auth()->user()->role);
+
+        $xml = $this->loadTourXmlFromS3($municipalSlug);
+        if ($xml === null) {
+            return back()->with('error', "tour.xml not found for {$municipalSlug}.");
+        }
+
+        $count = 0;
+        $xml = preg_replace_callback('/<view\b[^>]*?\/?>/i', function ($m) use (&$count, $fromRegex, $toValue) {
+            $tag = $m[0];
+            if (preg_match($fromRegex, $tag)) {
+                $tag = preg_replace($fromRegex, 'hlookat="' . $toValue . '"', $tag, 1);
+                $count++;
+            }
+            return $tag;
+        }, $xml);
+
+        if ($count > 0) {
+            $this->saveTourXmlToS3($municipalSlug, $xml);
+        }
+
+        Log::info('🔭 tour.xml scene-view hlookat update (S3)', [
+            'municipalSlug' => $municipalSlug,
+            'target'        => $toValue,
+            'views_updated' => $count,
+        ]);
+
+        return back()->with(
+            'success',
+            "Set hlookat={$toValue} on {$count} scene view(s) for {$municipalSlug}."
         );
     }
 }

@@ -128,6 +128,28 @@ const fixLayerNames = () => {
   );
 };
 
+const settingHlookat = ref(false);
+const setHlookat = (target) => {
+  if (
+    !confirm(
+      `Set every scene view's hlookat to ${target}° in this municipality's tour.xml?`
+    )
+  )
+    return;
+
+  settingHlookat.value = true;
+  router.post(
+    route(target === 180 ? "scenes.hlookat180" : "scenes.hlookat0"),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => alert(`Done. Scene views set to hlookat ${target}°.`),
+      onError: () => alert("Failed to update hlookat. Check the logs."),
+      onFinish: () => (settingHlookat.value = false),
+    }
+  );
+};
+
 const deleteScene = async (id) => {
   if (confirm("Are you sure you want to delete this scene?")) {
     router.delete(route("scenes.destroy", id), {
@@ -382,6 +404,38 @@ const categories = [
               "
           >
             {{ fixingNames ? "Fixing…" : "🏷️ Fix Layer Names" }}
+          </button>
+          <button
+            @click.prevent="setHlookat(180)"
+            :disabled="settingHlookat"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #1d4ed8;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ settingHlookat ? "Working…" : "🔭 hlookat 180" }}
+          </button>
+          <button
+            @click.prevent="setHlookat(0)"
+            :disabled="settingHlookat"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #475569;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ settingHlookat ? "Working…" : "🔭 hlookat 0" }}
           </button>
           <button
             @click.prevent="logout"

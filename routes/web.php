@@ -29,6 +29,10 @@ Route::middleware([
     Route::delete('/scenes/{id}', [SceneController::class, 'destroy'])->name('scenes.destroy');
     Route::post('/scenes/fix-layer-names', [SceneController::class, 'fixChildLayerNames'])
         ->name('scenes.fixLayerNames');
+    Route::post('/scenes/hlookat-180', [SceneController::class, 'setSceneViewHlookat180'])
+        ->name('scenes.hlookat180');
+    Route::post('/scenes/hlookat-0', [SceneController::class, 'setSceneViewHlookat0'])
+        ->name('scenes.hlookat0');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
 });
 
