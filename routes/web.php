@@ -34,6 +34,16 @@ Route::middleware([
     Route::post('/scenes/hlookat-0', [SceneController::class, 'setSceneViewHlookat0'])
         ->name('scenes.hlookat0');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
+
+    // Scenes for one municipality. props.municipal is ucfirst'd (e.g. "Pilar")
+    // while the DB stores it lowercased, so match case-insensitively.
+    Route::get('/api/scenes/{municipal}', function (string $municipal) {
+        return response()->json(
+            App\Models\Scene::whereRaw('LOWER(municipal) = ?', [strtolower($municipal)])
+                ->latest()
+                ->get()
+        );
+    });
 });
 
 Route::post('/scenes', [SceneController::class, 'store'])->name('scenes.store');
