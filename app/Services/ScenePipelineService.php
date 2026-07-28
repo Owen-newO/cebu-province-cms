@@ -68,14 +68,26 @@ class ScenePipelineService
         throw new \Exception('❌ KRPANO did not generate vtour/tour.xml');
     }
 
-    /* ================= 2️⃣ STATIC PATH CONFIG ================= */
+    /* ================= 2️⃣ READ TILING FROM KRPANO OUTPUT ================= */
 
-    // IMPORTANT: No municipal slug here.
+    // Do NOT hardcode the tile paths — krpano decides the .tiles folder name,
+    // the cube tile pattern, and the multires level list from the source image.
+    // Read them straight from the generated vtour/tour.xml (source of truth),
+    // otherwise the cube URLs won't match the uploaded files and no tiles load.
+    $krpano = $this->extractKrpanoSceneConfig($sceneId, $tourXmlPath);
 
-    $thumb    = "{$sceneId}/panos/{$sceneId}.tiles/thumb.jpg";
-    $preview  = "{$sceneId}/panos/{$sceneId}.tiles/preview.jpg";
-    $cubeUrl  = "{$sceneId}/panos/{$sceneId}.tiles/%s/l%l/%v/l%l_%s_%v_%h.jpg";
-    $multires = "512,640,1280,2560";
+    if (!$krpano || empty($krpano['cube'])) {
+        throw new \Exception('❌ Could not read tiling info (cube url) from generated vtour/tour.xml');
+    }
+
+    // The generated URLs are relative to vtour/ (e.g. "panos/X.tiles/...").
+    // uploadFolderToS3 puts vtour's CONTENTS under {municipalSlug}/{sceneId}/,
+    // and the master tour.xml lives at {municipalSlug}/tour.xml, so prefix each
+    // path with "{sceneId}/" to make it resolve from the municipal root.
+    $thumb    = "{$sceneId}/" . ltrim($krpano['thumb'], '/');
+    $preview  = "{$sceneId}/" . ltrim($krpano['preview'], '/');
+    $cubeUrl  = "{$sceneId}/" . ltrim($krpano['cube'], '/');
+    $multires = $krpano['multires'];
 
     /* ================= 3️⃣ UPLOAD VT0UR TO S3 ================= */
 
@@ -170,20 +182,33 @@ class ScenePipelineService
         $xml = @simplexml_load_file($tourXmlPath);
         if (!$xml) return null;
 
+        // Prefer the scene named after this upload, but krpano's makepano names
+        // the scene from the input image and the exact format varies, so fall
+        // back to the first <scene> (the makepano output always has exactly one).
         $target = 'scene_' . strtolower($sceneId);
+        $node   = null;
 
         foreach ($xml->scene as $scene) {
-            if (strtolower((string)$scene['name']) !== $target) continue;
-
-            return [
-                'thumb'    => (string)$scene['thumburl'],
-                'preview'  => (string)$scene->preview['url'],
-                'cube'     => (string)$scene->image->cube['url'],
-                'multires' => (string)$scene->image->cube['multires'],
-            ];
+            if (strtolower((string)$scene['name']) === $target) {
+                $node = $scene;
+                break;
+            }
         }
 
-        return null;
+        if ($node === null) {
+            $node = $xml->scene[0] ?? null;
+        }
+
+        if ($node === null || !isset($node->image->cube)) {
+            return null;
+        }
+
+        return [
+            'thumb'    => (string)($node['thumburl'] ?? ''),
+            'preview'  => isset($node->preview) ? (string)$node->preview['url'] : '',
+            'cube'     => (string)$node->image->cube['url'],
+            'multires' => (string)$node->image->cube['multires'],
+        ];
     }
 
     private function uploadFolderToS3(string $localFolder, string $remoteFolder): void
