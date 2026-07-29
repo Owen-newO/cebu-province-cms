@@ -105,6 +105,15 @@ class ScenePipelineService
         $municipalSlug
     );
 
+    /* ========= 5️⃣ SYNC PROVINCE cebu/tour.xml THUMBNAIL RAIL ========= */
+    // Keep the province tour in sync with every add. Never let a problem here
+    // fail the (already-built) scene — just log it.
+    try {
+        $this->rebuildCebuThumbnails();
+    } catch (\Throwable $e) {
+        Log::warning('⚠️ Could not sync cebu/tour.xml after add', ['error' => $e->getMessage()]);
+    }
+
     Log::info('✅ Scene pipeline finished', [
         'scene_uid' => $sceneId,
     ]);
@@ -135,6 +144,98 @@ class ScenePipelineService
         $this->removeLayerFromXml($sceneId, $municipalSlug);
         $this->removeDirectionsFromXml($sceneId, $municipalSlug);
         $this->forceDeleteS3Directory("{$municipalSlug}/{$sceneId}");
+    }
+
+    private function municipalSlug(string $municipal): string
+    {
+        return strtolower(trim(str_replace([' ', '/', '\\'], '_', $municipal)));
+    }
+
+    // =====================================================================
+    // PROVINCE (cebu/tour.xml) — REBUILD ALL PUBLISHED SCENE THUMBNAILS
+    // =====================================================================
+    // Regenerates the thumbnail rail in the province master tour so it always
+    // mirrors the CMS. Called on add (processNewScene) and edit (controller),
+    // and by the manual "Inject to Cebu Tour" button. Idempotent: existing
+    // injected thumbnails (isFiltermuni) are stripped first, then one lay_{title}
+    // thumbnail per published scene (across every municipality) is inserted right
+    // after "topni" (i.e. as a child of "scrollarea1"). The isMunicipalButton
+    // selector layers are untouched.
+    //
+    // The province tour filters by MUNICIPALITY: action.xml shows layers where
+    // isFiltermuni="true" AND municipal == selected municipality, so each thumb
+    // carries isFiltermuni + municipal="{Proper Case}" (ucwords matches the
+    // hardcoded action.xml names). Asset urls are root-relative here, so the
+    // thumb url is prefixed with the municipality slug. Clicking a thumbnail
+    // navigates (same tab) to that municipality's own tour at the linked scene.
+    //
+    // The province file is the s3 disk ROOT (root is already "cebu"), so its key
+    // is just "tour.xml". Returns the number of thumbnails injected. Throws if
+    // the file or the topni anchor is missing.
+    public function rebuildCebuThumbnails(): int
+    {
+        $key  = 'tour.xml'; // s3 disk root is "cebu" → this is cebu/tour.xml
+        $disk = Storage::disk('s3');
+
+        if (!$disk->exists($key)) {
+            throw new \RuntimeException('Province cebu/tour.xml not found on S3.');
+        }
+
+        $xml    = $disk->get($key);
+        $anchor = '/(<layer\b[^>]*\bname="topni"[^>]*\/?>)/i';
+
+        if (!preg_match($anchor, $xml)) {
+            throw new \RuntimeException("'topni' layer not found in cebu/tour.xml.");
+        }
+
+        // Strip previously-injected thumbnails (isFiltermuni blocks) — a clean
+        // regenerate, not an append. isMunicipalButton selectors are preserved.
+        $xml = preg_replace('/\s*<layer\b[^>]*\bisFiltermuni="true"[^>]*>.*?<\/layer>/is', '', $xml);
+
+        $scenes = Scene::where('is_published', 1)->latest()->get();
+        $thumbs = '';
+        $count  = 0;
+
+        foreach ($scenes as $scene) {
+            $title = trim((string) $scene->title);
+            if ($title === '' || empty($scene->panorama_path)) {
+                continue;
+            }
+
+            $municipalSlug = $this->municipalSlug((string) $scene->municipal);
+            $sceneId       = pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH) ?: $scene->panorama_path, PATHINFO_FILENAME);
+            if ($sceneId === '') {
+                continue;
+            }
+
+            $safeTitle     = htmlspecialchars($title, ENT_QUOTES);
+            $safeText      = htmlspecialchars(ucfirst(strtolower(str_replace('_', ' ', $title))), ENT_QUOTES);
+            $municipalName = htmlspecialchars(ucwords(strtolower(trim((string) $scene->municipal))), ENT_QUOTES);
+            $thumbUrl      = "{$municipalSlug}/{$sceneId}/panos/{$sceneId}.tiles/thumb.jpg";
+
+            $thumbs .= "
+<layer name=\"lay_{$safeTitle}\"
+    url=\"{$thumbUrl}\"
+    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
+    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
+    keep=\"true\" scale=\".495\" isFiltermuni=\"true\" linkedscene=\"scene_{$sceneId}\"
+    municipal=\"{$municipalName}\" enabled=\"true\" onclick=\"jscall(window.location.href='https://www.mata.com/cebu/{$municipalSlug}/tour.html?startscene=scene_{$sceneId}');\" ispublished=\"true\">
+    <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$safeText}\" width=\"100%\" autoheight=\"true\"
+        align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
+        css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
+</layer>";
+            $count++;
+        }
+
+        $xml = preg_replace_callback($anchor, function ($m) use ($thumbs) {
+            return $m[1] . "\n" . $thumbs;
+        }, $xml, 1);
+
+        $disk->put($key, $xml);
+
+        Log::info('🏙️ Province cebu/tour.xml thumbnails rebuilt', ['thumbnails' => $count]);
+
+        return $count;
     }
 
     /* =====================================================
