@@ -33,6 +33,8 @@ Route::middleware([
         ->name('scenes.hlookat180');
     Route::post('/scenes/hlookat-0', [SceneController::class, 'setSceneViewHlookat0'])
         ->name('scenes.hlookat0');
+    Route::post('/scenes/inject-cebu', [SceneController::class, 'injectAllThumbsToCebu'])
+        ->name('scenes.injectCebu');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
 
     // Scenes for one municipality. props.municipal is ucfirst'd (e.g. "Pilar")

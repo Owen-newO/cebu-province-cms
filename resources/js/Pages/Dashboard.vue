@@ -150,6 +150,28 @@ const setHlookat = (target) => {
   );
 };
 
+const injectingCebu = ref(false);
+const injectCebu = () => {
+  if (
+    !confirm(
+      "Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality? Existing injected thumbnails are replaced."
+    )
+  )
+    return;
+
+  injectingCebu.value = true;
+  router.post(
+    route("scenes.injectCebu"),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => alert("Done. cebu/tour.xml thumbnails regenerated."),
+      onError: () => alert("Failed to inject into cebu/tour.xml. Check the logs."),
+      onFinish: () => (injectingCebu.value = false),
+    }
+  );
+};
+
 const deleteScene = async (id) => {
   if (confirm("Are you sure you want to delete this scene?")) {
     router.delete(route("scenes.destroy", id), {
@@ -436,6 +458,22 @@ const categories = [
               "
           >
             {{ settingHlookat ? "Working…" : "🔭 hlookat 0" }}
+          </button>
+          <button
+            @click.prevent="injectCebu"
+            :disabled="injectingCebu"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #047857;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ injectingCebu ? "Injecting…" : "🏙️ Inject to Cebu Tour" }}
           </button>
           <button
             @click.prevent="logout"

@@ -1707,4 +1707,106 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             "Set hlookat={$toValue} on {$count} scene view(s) for {$municipalSlug}."
         );
     }
+
+    // =====================================================================
+    // PROVINCE (cebu/tour.xml) — INJECT ALL PUBLISHED SCENE THUMBNAILS
+    // =====================================================================
+    // Rebuilds the thumbnail rail in the province master tour (S3 "cebu/tour.xml",
+    // which is the s3 disk ROOT — root is already "cebu" — so its key is just
+    // "tour.xml"). Every published scene across every municipality becomes a
+    // lay_{title} thumbnail inserted right after the "topni" layer, i.e. as a
+    // child of "scrollarea1". Idempotent: existing injected thumbnails are
+    // stripped first, so the button can be clicked to regenerate any time.
+    //
+    // The province tour filters this rail by MUNICIPALITY (not barangay): its
+    // action.xml "filterItems" shows layers where isFiltermuni="true" AND
+    // municipal == selected municipality. So each thumbnail carries
+    // isFiltermuni="true" and municipal="{Proper Case Name}" — matching the
+    // hardcoded names in action.xml ("Pilar", "San Francisco", "Santa Fe", …),
+    // which ucwords(strtolower()) reproduces from the stored value. The
+    // isMunicipalButton="true" selector layers are left untouched.
+    //
+    // Asset URLs are ROOT-relative in this file (e.g. thumburl="panos/..."), and
+    // each scene's tiles live under "{municipalSlug}/{sceneId}/...", so the thumb
+    // url is prefixed with the municipality slug.
+    public function injectAllThumbsToCebu()
+    {
+        $key  = 'tour.xml'; // s3 disk root is "cebu", so this is cebu/tour.xml
+        $disk = Storage::disk('s3');
+
+        if (!$disk->exists($key)) {
+            return back()->with('error', 'Province cebu/tour.xml not found on S3.');
+        }
+
+        $xml = $disk->get($key);
+
+        // Must have the topni anchor inside scrollarea1.
+        $anchor = '/(<layer\b[^>]*\bname="topni"[^>]*\/?>)/i';
+        if (!preg_match($anchor, $xml, $m)) {
+            return back()->with('error', "'topni' layer not found in cebu/tour.xml — cannot inject.");
+        }
+
+        // 1) Strip previously-injected thumbnails (isFiltermuni blocks) so this
+        //    is a clean regenerate rather than an append. This targets ONLY the
+        //    thumbnail rail — the isMunicipalButton selector layers don't carry
+        //    isFiltermuni, so they're preserved.
+        $xml = preg_replace('/\s*<layer\b[^>]*\bisFiltermuni="true"[^>]*>.*?<\/layer>/is', '', $xml);
+
+        // 2) Build one thumbnail per published scene, across ALL municipalities.
+        $scenes = Scene::where('is_published', 1)->latest()->get();
+
+        $thumbs = '';
+        $count  = 0;
+
+        foreach ($scenes as $scene) {
+            $title = trim((string) $scene->title);
+            if ($title === '' || empty($scene->panorama_path)) {
+                continue;
+            }
+
+            $municipalSlug = $this->municipalSlug($scene->municipal);
+            $sceneId       = pathinfo(parse_url($scene->panorama_path, PHP_URL_PATH) ?: $scene->panorama_path, PATHINFO_FILENAME);
+            if ($sceneId === '') {
+                continue;
+            }
+
+            $safeTitle     = htmlspecialchars($title, ENT_QUOTES);
+            $text          = ucfirst(strtolower(str_replace('_', ' ', $title)));
+            $safeText      = htmlspecialchars($text, ENT_QUOTES);
+            // Title-case the stored municipality so it matches action.xml's
+            // hardcoded names ("San Francisco", "Santa Fe", "Pilar", …).
+            $municipalName = htmlspecialchars(ucwords(strtolower(trim((string) $scene->municipal))), ENT_QUOTES);
+            $thumbUrl      = "{$municipalSlug}/{$sceneId}/panos/{$sceneId}.tiles/thumb.jpg";
+
+            $thumbs .= "
+<layer name=\"lay_{$safeTitle}\"
+    url=\"{$thumbUrl}\"
+    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
+    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
+    keep=\"true\" scale=\".495\" isFiltermuni=\"true\" linkedscene=\"scene_{$sceneId}\"
+    municipal=\"{$municipalName}\" enabled=\"true\" onclick=\"navigation();filter_init();\" ispublished=\"true\">
+    <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$safeText}\" width=\"100%\" autoheight=\"true\"
+        align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
+        css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
+</layer>";
+            $count++;
+        }
+
+        // 3) Insert the thumbnails right after the topni layer (siblings inside
+        //    scrollarea1). preg_replace with a literal-safe callback replacement.
+        $xml = preg_replace_callback($anchor, function ($mm) use ($thumbs) {
+            return $mm[1] . "\n" . $thumbs;
+        }, $xml, 1);
+
+        $disk->put($key, $xml);
+
+        Log::info('🏙️ Province cebu/tour.xml thumbnails regenerated', [
+            'thumbnails_injected' => $count,
+        ]);
+
+        return back()->with(
+            'success',
+            "Injected {$count} published scene thumbnail(s) into cebu/tour.xml."
+        );
+    }
 }
