@@ -1733,6 +1733,62 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     }
 
     // =====================================================================
+    // FIX "topni" LAYER ACROSS EVERY tour.xml UNDER cebu/ (S3)
+    // =====================================================================
+    // Rewrites the header spacer layer (name="topni") to the fixed-height format
+    // in every municipality tour.xml plus the province root tour.xml. The s3 disk
+    // root is already "cebu", so keys are "{municipal}/tour.xml" and root "tour.xml".
+    public function fixTopni()
+    {
+        $disk = Storage::disk('s3');
+
+        $newTopni = '<layer name="topni" type="container" width="100%" '
+            . 'height.desktop="124" height.tablet="150" height.mobile="124" align="top"/>';
+
+        // Match the topni opening (self-closing) tag regardless of its attributes.
+        $pattern = '/<layer\b[^>]*\bname="topni"[^>]*\/>/is';
+
+        // Collect every tour.xml: the province root + one per top-level folder.
+        $keys = [];
+        if ($disk->exists('tour.xml')) {
+            $keys[] = 'tour.xml';
+        }
+        foreach ($disk->directories('') as $dir) {
+            $key = trim($dir, '/') . '/tour.xml';
+            if ($disk->exists($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        $scanned = 0;
+        $changed = 0;
+
+        foreach ($keys as $key) {
+            $scanned++;
+            $xml = $disk->get($key);
+            if ($xml === null) {
+                continue;
+            }
+
+            $new = preg_replace($pattern, $newTopni, $xml, -1, $count);
+            if ($new !== null && $count > 0 && $new !== $xml) {
+                $disk->put($key, $new);
+                $changed++;
+            }
+        }
+
+        Log::info('🧱 topni layer fixed across tours (S3)', [
+            'scanned' => $scanned,
+            'changed' => $changed,
+        ]);
+
+        return back()->with(
+            'success',
+            "Fixed topni in {$changed} of {$scanned} tour.xml file(s) under cebu/."
+        );
+    }
+
+    // =====================================================================
     // PROVINCE (cebu/tour.xml) — INJECT ALL PUBLISHED SCENE THUMBNAILS (button)
     // =====================================================================
     // Manual "Inject to Cebu Tour" trigger. The actual rebuild lives in

@@ -150,6 +150,28 @@ const setHlookat = (target) => {
   );
 };
 
+const fixingTopni = ref(false);
+const fixTopni = () => {
+  if (
+    !confirm(
+      "Rewrite the 'topni' header layer to fixed heights in EVERY tour.xml under cebu/ (all municipalities + province)?"
+    )
+  )
+    return;
+
+  fixingTopni.value = true;
+  router.post(
+    route("scenes.fixTopni"),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => alert("Done. topni updated across all tour.xml files."),
+      onError: () => alert("Failed to fix topni. Check the logs."),
+      onFinish: () => (fixingTopni.value = false),
+    }
+  );
+};
+
 const injectingCebu = ref(false);
 const injectCebu = () => {
   if (
@@ -458,6 +480,22 @@ const categories = [
               "
           >
             {{ settingHlookat ? "Working…" : "🔭 hlookat 0" }}
+          </button>
+          <button
+            @click.prevent="fixTopni"
+            :disabled="fixingTopni"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #b45309;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ fixingTopni ? "Fixing…" : "🧱 Fixed Topni" }}
           </button>
           <button
             @click.prevent="injectCebu"
