@@ -106,6 +106,10 @@ const logout = () => {
   router.post(route("logout"));
 };
 
+// Toggle for the maintenance/admin buttons in the header (Fix Layer Names,
+// hlookat, Fixed Topni, Inject to Cebu Tour). Set to true to show them again.
+const showTools = ref(false);
+
 const fixingNames = ref(false);
 const fixLayerNames = () => {
   if (
@@ -264,7 +268,17 @@ onMounted(() => {
       date: new Date(scene.created_at).toLocaleDateString(),
     }));
 
-    scenes.value = groupByTitle(allPublishedScenes.value);
+    // Don't clobber the user's open group. If a group is active, refresh it in
+    // place; otherwise show the full grouped list.
+    if (activeGroupTitle.value) {
+      const filtered = allPublishedScenes.value.filter(
+        (s) => s.title.trim() === activeGroupTitle.value.trim()
+      );
+      activeGroupCount.value = filtered.length;
+      scenes.value = filtered;
+    } else {
+      scenes.value = groupByTitle(allPublishedScenes.value);
+    }
 
     const stillProcessing = data.some(
       (s) => s.status === "queued" || s.status === "processing"
@@ -433,6 +447,7 @@ const categories = [
           }}
         </h1>
         <div style="display:flex; align-items:center; gap:12px;">
+          <template v-if="showTools">
           <button
             @click.prevent="fixLayerNames"
             :disabled="fixingNames"
@@ -513,6 +528,7 @@ const categories = [
           >
             {{ injectingCebu ? "Injecting…" : "🏙️ Inject to Cebu Tour" }}
           </button>
+          </template>
           <button
             @click.prevent="logout"
             style="
@@ -660,18 +676,18 @@ const categories = [
         <!-- Back Button for Filtered Group -->
         <div
           v-if="activeGroupTitle"
-          style="margin:0 40px 20px;display: flex;justify-content:space-between; "
+          style="position:relative; margin:0 40px 20px; display:flex; justify-content:center; align-items:center; min-height:52px;"
         >
           <button
             @click="clearGroupFilter"
-            style="background:#101828; color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-size:18px; font-weight:500;"
+            style="position:absolute; left:0; top:50%; transform:translateY(-50%); background:#101828; color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-size:18px; font-weight:500;"
           >
             ← All Scenes
           </button>
           <div
-            style="display: flex;justify-content:space-between; flex-direction: column; align-items: center;"
+            style="display:flex; flex-direction:column; align-items:center; text-align:center;"
           >
-            <p style=" font-weight:600;font-size: 20px;">
+            <p style="font-weight:600;font-size: 20px;">
               {{ activeGroupTitle }} Scenes
             </p>
             <p
