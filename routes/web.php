@@ -37,6 +37,8 @@ Route::middleware([
         ->name('scenes.injectCebu');
     Route::post('/scenes/fix-topni', [SceneController::class, 'fixTopni'])
         ->name('scenes.fixTopni');
+    Route::post('/scenes/lay-prefix', [SceneController::class, 'addLayPrefixToThumbs'])
+        ->name('scenes.layPrefix');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
 
     // Scenes for one municipality. props.municipal is ucfirst'd (e.g. "Pilar")

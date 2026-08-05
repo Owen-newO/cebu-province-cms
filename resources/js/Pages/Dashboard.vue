@@ -154,6 +154,28 @@ const setHlookat = (target) => {
   );
 };
 
+const addingLayPrefix = ref(false);
+const addLayPrefix = () => {
+  if (
+    !confirm(
+      "Add the 'lay_' prefix to EVERY municipal thumbnail name across all tour.xml files? (e.g. \"Shipwreck\" → \"lay_Shipwreck\")"
+    )
+  )
+    return;
+
+  addingLayPrefix.value = true;
+  router.post(
+    route("scenes.layPrefix"),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => alert("Done. lay_ prefix added to municipal thumbnails."),
+      onError: () => alert("Failed to add lay_ prefix. Check the logs."),
+      onFinish: () => (addingLayPrefix.value = false),
+    }
+  );
+};
+
 const fixingTopni = ref(false);
 const fixTopni = () => {
   if (
@@ -511,6 +533,22 @@ const categories = [
               "
           >
             {{ fixingTopni ? "Fixing…" : "🧱 Fixed Topni" }}
+          </button>
+          <button
+            @click.prevent="addLayPrefix"
+            :disabled="addingLayPrefix"
+            style="
+                  font-size: 16px;
+                  padding: 8px 20px;
+                  border-radius: 20px;
+                  border: 1px solid #d1d5db;
+                  background-color: #7c3aed;
+                  color: #fff;
+                  cursor: pointer;
+                  transition: all 0.2s ease;
+              "
+          >
+            {{ addingLayPrefix ? "Adding…" : "🏷️ Add lay_ to Thumbs" }}
           </button>
           <button
             @click.prevent="injectCebu"

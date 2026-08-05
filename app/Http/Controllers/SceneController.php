@@ -1409,8 +1409,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
             if ($isThumb) {
                 // Thumbnail: name is lay_{title} + barangay/category filters.
-                // The lay_ prefix keeps the layer name valid when the title is
-                // numeric (krpano can't reliably reference a layer named "123").
+                // (lay_ prefix keeps the layer name valid for numeric titles.)
                 $tag = $setName($tag, 'lay_' . $newTitle);
                 $tag = $setAttr($tag, 'barangay', $newBarangay);
                 $tag = $setAttr($tag, 'categories', $newCategory);
@@ -1785,6 +1784,84 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
         return back()->with(
             'success',
             "Fixed topni in {$changed} of {$scanned} tour.xml file(s) under cebu/."
+        );
+    }
+
+    // =====================================================================
+    // ADD "lay_" PREFIX TO EVERY MUNICIPAL THUMBNAIL NAME (S3, all tours)
+    // =====================================================================
+    // Migration for existing scenes: prefixes each municipal thumbnail layer's
+    // name with "lay_" (e.g. name="Shipwreck" -> name="lay_Shipwreck"), matching
+    // what new uploads now inject. Municipal thumbnails are the ONLY layers with
+    // isFilterbrgy="true", so the cebu province rail (isFiltermuni) and every
+    // other layer are untouched. Idempotent: already-prefixed names are skipped.
+    public function addLayPrefixToThumbs()
+    {
+        $disk = Storage::disk('s3');
+
+        // Every tour.xml: province root + one per top-level folder.
+        $keys = [];
+        if ($disk->exists('tour.xml')) {
+            $keys[] = 'tour.xml';
+        }
+        foreach ($disk->directories('') as $dir) {
+            $key = trim($dir, '/') . '/tour.xml';
+            if ($disk->exists($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        $scanned         = 0;
+        $filesChanged    = 0;
+        $layersPrefixed  = 0;
+
+        foreach ($keys as $key) {
+            $scanned++;
+            $xml = $disk->get($key);
+            if ($xml === null) {
+                continue;
+            }
+
+            $count = 0;
+
+            // Match each thumbnail opening tag (carries isFilterbrgy="true") and
+            // prefix its name with lay_ unless it already has it.
+            $new = preg_replace_callback(
+                '/<layer\b[^>]*\bisFilterbrgy="true"[^>]*>/i',
+                function ($m) use (&$count) {
+                    return preg_replace_callback(
+                        '/\bname="([^"]*)"/i',
+                        function ($nm) use (&$count) {
+                            $name = $nm[1];
+                            if (stripos($name, 'lay_') === 0) {
+                                return 'name="' . $name . '"'; // already prefixed
+                            }
+                            $count++;
+                            return 'name="lay_' . $name . '"';
+                        },
+                        $m[0],
+                        1
+                    );
+                },
+                $xml
+            );
+
+            if ($new !== null && $count > 0 && $new !== $xml) {
+                $disk->put($key, $new);
+                $filesChanged++;
+                $layersPrefixed += $count;
+            }
+        }
+
+        Log::info('🏷️ Added lay_ prefix to municipal thumbnails (S3)', [
+            'scanned'        => $scanned,
+            'files_changed'  => $filesChanged,
+            'layers_renamed' => $layersPrefixed,
+        ]);
+
+        return back()->with(
+            'success',
+            "Prefixed {$layersPrefixed} thumbnail(s) with lay_ across {$filesChanged} tour.xml file(s)."
         );
     }
 

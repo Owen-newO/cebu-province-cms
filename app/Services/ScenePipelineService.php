@@ -366,6 +366,7 @@ class ScenePipelineService
         $howToGetThere = htmlspecialchars($howToGetThere, ENT_QUOTES, 'UTF-8');  
         $sceneBlock = "
 <scene name=\"scene_{$sceneId}\" places=\"{$validated['title']}\" title=\"{$validated['title']}\" onstart=\"filterLayersByPlace\" subtitle=\"{$validated['location']}\" thumburl=\"{$thumb}\" ispublished=\"{$isPublishedAttr}\"  how_to_get_there=\"{$howToGetThere}\">
+  <view hlookat=\"0\" vlookat=\"0.0\" fovtype=\"MFOV\" fov=\"120\" maxpixelzoom=\"2.0\" fovmin=\"70\" fovmax=\"140\" limitview=\"auto\" />
   <preview url=\"{$preview}\" />
   <image>
     <cube url=\"{$cubeUrl}\" multires=\"{$multires}\" />
@@ -400,19 +401,24 @@ class ScenePipelineService
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) return;
 
-        $text = ucfirst(strtolower(str_replace('_', ' ', $sceneTitle)));
-        $safeTitle = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $text            = str_replace('_', ' ', $sceneTitle);
+        $safeTitle       = htmlspecialchars($sceneTitle, ENT_QUOTES);
+        $safeText        = htmlspecialchars($text, ENT_QUOTES);
+        $category        = $validated['category'] ?? '';
+        $safeCategory    = htmlspecialchars($category, ENT_QUOTES);
+        // Only flag as category-filterable when a category was chosen.
+        $isCategoryAttr  = trim($category) !== '' ? ' iscategory="true"' : '';
         $isPublishedAttr = ((int)($validated['is_published'] ?? 0) === 1) ? 'true' : 'false';
 
         $layer = "
 <layer name=\"lay_{$safeTitle}\"
     url=\"{$thumb}\"
-    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\" 
-    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\" 
-    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\" 
-    barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\" ispublished=\"{$isPublishedAttr}\">
-    <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$text}\" width=\"100%\" autoheight=\"true\"
-        align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\" 
+    width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
+    bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
+    keep=\"true\" scale=\".495\" isFilterbrgy=\"true\" linkedscene=\"scene_{$sceneId}\"
+    barangay=\"{$barangay}\" enabled=\"true\" onclick=\"navigation();filter_init();\" ispublished=\"{$isPublishedAttr}\" places=\"{$safeTitle}\" categories=\"{$safeCategory}\"{$isCategoryAttr}>
+    <layer name=\"text_{$safeTitle}\" type=\"text\" text=\"{$safeText}\" width=\"100%\" autoheight=\"true\"
+        align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
 </layer>
 ";
