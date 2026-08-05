@@ -21,6 +21,21 @@ class SceneController extends Controller
         return strtolower(trim(str_replace([' ', '/', '\\'], '_', $municipal)));
     }
 
+    // For per-municipality maintenance actions: the admin account may target a
+    // selected municipality via a "municipal" request param; municipal users are
+    // always scoped to their own role.
+    private function resolveMunicipalSlug(): string
+    {
+        $user      = auth()->user();
+        $requested = request('municipal');
+
+        if ($requested && strtolower($user->role ?? '') === 'admin') {
+            return $this->municipalSlug($requested);
+        }
+
+        return $this->municipalSlug($user->role);
+    }
+
     private function extractIframeSrc($iframeHtml)
     {
         if (!$iframeHtml) return null;
@@ -1557,7 +1572,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     // =====================================================================
     public function fixChildLayerNames()
     {
-        $municipalSlug = $this->municipalSlug(auth()->user()->role);
+        $municipalSlug = $this->resolveMunicipalSlug();
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) {
@@ -1698,7 +1713,7 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
     private function applySceneViewHlookat(string $fromRegex, string $toValue)
     {
-        $municipalSlug = $this->municipalSlug(auth()->user()->role);
+        $municipalSlug = $this->resolveMunicipalSlug();
 
         $xml = $this->loadTourXmlFromS3($municipalSlug);
         if ($xml === null) {

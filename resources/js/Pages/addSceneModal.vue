@@ -8,6 +8,10 @@ const emit = defineEmits(["close", "saveDraft", "publishScene"]);
 const props = defineProps({
   barangays: Array,
   municipal: String,
+  // When false, the built-in "+ Add Scene" button is hidden so the parent can
+  // supply its own trigger (via the exposed openModal()). Default keeps the
+  // original behavior for the municipal dashboard.
+  showTrigger: { type: Boolean, default: true },
 });
 
 const categories = [
@@ -327,6 +331,7 @@ const updateScene = () => {
   
   <!-- OPEN MODAL BUTTON -->
   <button
+    v-if="showTrigger"
     @click="openModal"
     style="
       background-color:#2563eb;

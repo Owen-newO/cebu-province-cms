@@ -11,6 +11,11 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
+        // Admins get the multi-municipality admin dashboard instead.
+        if (strtolower($user->role ?? '') === 'admin') {
+            return redirect()->route('admin');
+        }
+
         // Normalize municipal
         $municipal = strtolower($user->role);
 

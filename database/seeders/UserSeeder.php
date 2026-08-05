@@ -10,6 +10,16 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Province-wide admin — lands on the MATA ADMIN DASHBOARD (/admin).
+        User::updateOrCreate(
+            ['email' => 'admin@mata.cms'],
+            [
+                'name'     => 'MATA Admin',
+                'password' => Hash::make('mataadmin'),
+                'role'     => 'admin',
+            ]
+        );
+
         User::updateOrCreate(
             ['email' => 'samboan@mata.cms'],
             [

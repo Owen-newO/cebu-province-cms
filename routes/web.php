@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\SceneController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 use App\Models\Scene;
@@ -24,6 +25,8 @@ Route::middleware([
 ])->group(function () {
     // your current home dashboard
     Route::get('/', [DashboardController::class, 'index'])->name('Dashboard');
+    // MATA admin dashboard (municipality selector); role=admin only
+    Route::get('/admin', [AdminController::class, 'index'])->name('admin');
     Route::post('/dashboard', [SceneController::class, 'index'])->name('dashboard.post');
     Route::post('/scenes', [SceneController::class, 'store'])->name('scenes.store');
     Route::delete('/scenes/{id}', [SceneController::class, 'destroy'])->name('scenes.destroy');
