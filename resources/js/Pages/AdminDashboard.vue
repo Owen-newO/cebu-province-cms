@@ -203,12 +203,12 @@ const publishScene = async (id) => {
 // ------------------------------------------------------------------
 // Admin maintenance actions
 // ------------------------------------------------------------------
-const runAction = async (url, { municipal = false, label }) => {
+const runAction = async (url, { municipal = false, label, confirmMsg }) => {
   if (municipal && !selectedMunicipal.value) {
     alert("Select a municipality first.");
     return;
   }
-  if (!confirm(`Run "${label}"?`)) return;
+  if (!window.confirm(confirmMsg || `Run "${label}"?`)) return;
   busy.value = label;
   try {
     const body = municipal ? { municipal: selectedMunicipal.value } : {};
@@ -280,12 +280,12 @@ const logout = () => router.post(route("logout"));
       <header style="background:white; padding:20px 40px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e5e7eb; flex-wrap:wrap; gap:12px;">
         <h1 style="font-size:25px; font-weight:700;">MATA ADMIN DASHBOARD</h1>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button @click.prevent="runAction(route('scenes.fixLayerNames'), { municipal:true, label:'Fix Layer Names' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0f172a; color:#fff; cursor:pointer;">🏷️ Fix Layer Names</button>
-          <button @click.prevent="runAction(route('scenes.hlookat180'), { municipal:true, label:'hlookat 180' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#1d4ed8; color:#fff; cursor:pointer;">🔭 hlookat 180</button>
-          <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">🔭 hlookat 0</button>
-          <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">🧱 Fixed Topni</button>
-          <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">🏷️ Add lay_</button>
-          <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">🏙️ Inject to Cebu</button>
+          <button @click.prevent="runAction(route('scenes.fixLayerNames'), { municipal:true, label:'Fix Layer Names', confirmMsg:`Fix child layer names in ${municipalDisplay || 'the selected municipality'} only?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0f172a; color:#fff; cursor:pointer;">🏷️ Fix Layer Names</button>
+          <button @click.prevent="runAction(route('scenes.hlookat180'), { municipal:true, label:'hlookat 180', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 180?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#1d4ed8; color:#fff; cursor:pointer;">🔭 hlookat 180</button>
+          <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 0?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">🔭 hlookat 0</button>
+          <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni', confirmMsg:'Rewrite the topni layer in ALL tour.xml files (every municipality + province)? This affects the whole province.' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">🧱 Fixed Topni</button>
+          <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs', confirmMsg:'Add the lay_ prefix to thumbnails in ALL 44 municipalities? This rewrites every tour.xml under cebu/.' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">🏷️ Add lay_</button>
+          <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour', confirmMsg:'Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality?' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">🏙️ Inject to Cebu</button>
         </div>
       </header>
 
@@ -321,34 +321,78 @@ const logout = () => router.post(route("logout"));
         <p v-if="loading" style="margin:0 40px; color:#6b7280;">Loading…</p>
         <p v-else-if="!filteredScenes.length" style="margin:0 40px; color:#6b7280;">No published scenes for {{ municipalDisplay }}.</p>
 
-        <div style="padding:20px 40px; display:flex; flex-flow:row wrap; gap:24px;">
+        <!-- Scene Cards — same layout/onclick as the municipal dashboard -->
+        <div style="padding:30px 40px; display:flex; flex-flow:row wrap; gap:30px; width:100%; justify-content:left; max-width:1600px; margin:0 auto;">
           <div
             v-for="scene in filteredScenes"
             :key="scene.id"
-            style="background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px; width:32%; min-width:420px;"
+            style="background:#fff; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1); padding:16px; width:32%; min-width:450px; flex-direction:column; justify-content:space-between;"
           >
-            <div style="position:relative; width:100%; height:180px; border-radius:12px; overflow:hidden; margin-bottom:12px;">
-              <img
-                v-if="!imageFailed[scene.id]"
-                :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
-                loading="lazy" alt=""
-                style="width:100%; height:100%; object-fit:cover;"
-                @error="imageFailed[scene.id]=true; checkThumbnailReady(scene.id, getImageUrl(getThumbnail(scene.panorama_path || scene.img)))"
-              />
-              <div v-else style="width:100%; height:100%; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-weight:600; color:#6b7280;">⏳ Generating panorama…</div>
-              <div v-if="scene.count > 1" @click="filterGroup(scene.title)" style="position:absolute; top:10px; right:10px; background:#facc15; color:#000; font-weight:600; font-size:13px; border-radius:20px; padding:4px 10px; cursor:pointer;">{{ scene.count }} Scenes</div>
+            <div style="position:relative;">
+              <div style="position:relative; width:100%; height:180px; border-radius:12px; overflow:hidden; margin-bottom:12px;">
+                <img
+                  v-if="!imageFailed[scene.id]"
+                  :src="getImageUrl(getThumbnail(scene.panorama_path || scene.img))"
+                  loading="lazy" alt=""
+                  style="width:100%; height:100%; object-fit:cover;"
+                  @error="imageFailed[scene.id]=true; checkThumbnailReady(scene.id, getImageUrl(getThumbnail(scene.panorama_path || scene.img)))"
+                />
+                <div v-else style="width:100%; height:100%; background:#f3f4f6; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:600; color:#6b7280;">⏳ Generating panorama…</div>
+              </div>
+              <div v-if="scene.count > 1" style="position:absolute; top:10px; right:10px; background:#facc15; color:#000; font-weight:600; font-size:13px; border-radius:20px; padding:4px 10px; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 4px rgba(0,0,0,0.25);">{{ scene.count }} Scenes</div>
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h2 style="font-size:18px; font-weight:600; color:#000;">{{ scene.title }}</h2>
               <span style="background:#f9fafb; border-radius:20px; font-size:12px; padding:4px 12px; color:#111827; border:1px solid #e5e7eb;">{{ scene.date }}</span>
             </div>
-            <p style="color:#6b7280; font-size:13px; margin:6px 0 12px;">Brgy. {{ scene.barangay || "—" }}</p>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h2 style="font-size:14px; color:#000;margin-right: 50px;font-style: italic;">{{ scene.location }}</h2>
+            </div>
 
-            <div style="display:flex; gap:8px;">
-              <button @click="sceneModal && sceneModal.openForEdit(scene)" style="flex:1; padding:8px; border:1px solid #d1d5db; background:#fff; border-radius:8px; cursor:pointer; font-size:14px;">Edit</button>
-              <button @click="handleView(scene)" style="flex:1; padding:8px; border:none; background:#2563eb; color:#fff; border-radius:8px; cursor:pointer; font-size:14px;">View</button>
-              <button @click="deleteScene(scene.id)" style="flex:1; padding:8px; border:none; background:#dc2626; color:#fff; border-radius:8px; cursor:pointer; font-size:14px;">Delete</button>
+            <div style="display:flex; align-items:center; gap:16px; margin-top:6px; color:#6b7280; font-size:14px;padding-bottom: 15px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <img src="/images/barangay_pin.png" style="width:16px; height:18px;" />
+                <span>Brgy. {{ scene.barangay }}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <img src="/images/barangay_tag.png" style="width:16px; height:18px;" />
+                <span>{{ scene.category }}</span>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:center; align-items:center; gap:10px; margin:14px 50px 0;">
+              <!-- Group (multiple scenes) -->
+              <template v-if="scene.count > 1">
+                <button
+                  @click="filterGroup(scene.title)"
+                  style="flex:1; display:flex; align-items:center; margin-left: 125px; margin-right: 125px; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                >
+                  <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
+                </button>
+              </template>
+
+              <!-- Single scene -->
+              <template v-else>
+                <button
+                  @click="sceneModal && sceneModal.openForEdit(scene)"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:none; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                >
+                  <img src="/images/edit_pen.png" style="width:20px; height:18px;" /> Edit
+                </button>
+                <button
+                  @click="handleView(scene)"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#2383E2; color:#fff; border:1px solid #d1d5db; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                >
+                  <img src="/images/show_eye.png" style="width:20px; height:20px;" /> View
+                </button>
+                <button
+                  @click="deleteScene(scene.id)"
+                  style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; background:#e5094a; color:#fff; border:none; border-radius:10px; padding:8px 0; font-size:15px; cursor:pointer;"
+                >
+                  <img src="/images/delete_trash.png" style="width:15px; height:15px;" /> Delete
+                </button>
+              </template>
             </div>
           </div>
         </div>
