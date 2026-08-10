@@ -98,8 +98,11 @@ const xsrf = () => {
   const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : "";
 };
-const send = (method, url, body) =>
-  fetch(url, {
+const send = (method, url, body, timeoutMs = 180000) => {
+  // Abort after timeoutMs so a stalled request can never leave the UI stuck.
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  return fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
@@ -109,7 +112,9 @@ const send = (method, url, body) =>
     },
     credentials: "same-origin",
     body: body ? JSON.stringify(body) : undefined,
-  });
+    signal: ctrl.signal,
+  }).finally(() => clearTimeout(t));
+};
 
 // ------------------------------------------------------------------
 // Load a municipality's scenes
@@ -280,12 +285,12 @@ const logout = () => router.post(route("logout"));
       <header style="background:white; padding:20px 40px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e5e7eb; flex-wrap:wrap; gap:12px;">
         <h1 style="font-size:25px; font-weight:700;">MATA ADMIN DASHBOARD</h1>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button @click.prevent="runAction(route('scenes.fixLayerNames'), { municipal:true, label:'Fix Layer Names', confirmMsg:`Fix child layer names in ${municipalDisplay || 'the selected municipality'} only?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0f172a; color:#fff; cursor:pointer;">🏷️ Fix Layer Names</button>
-          <button @click.prevent="runAction(route('scenes.hlookat180'), { municipal:true, label:'hlookat 180', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 180?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#1d4ed8; color:#fff; cursor:pointer;">🔭 hlookat 180</button>
-          <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 0?` })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">🔭 hlookat 0</button>
-          <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni', confirmMsg:'Rewrite the topni layer in ALL tour.xml files (every municipality + province)? This affects the whole province.' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">🧱 Fixed Topni</button>
-          <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs', confirmMsg:'Add the lay_ prefix AND backfill categories/iscategory on thumbnails in ALL 44 municipalities? This rewrites every tour.xml under cebu/.' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">🏷️ Add lay_</button>
-          <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour', confirmMsg:'Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality?' })" :disabled="busy" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">🏙️ Inject to Cebu</button>
+          <button @click.prevent="runAction(route('scenes.fixLayerNames'), { municipal:true, label:'Fix Layer Names', confirmMsg:`Fix child layer names in ${municipalDisplay || 'the selected municipality'} only?` })" :disabled="busy === 'Fix Layer Names'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0f172a; color:#fff; cursor:pointer;">{{ busy === 'Fix Layer Names' ? 'Working…' : '🏷️ Fix Layer Names' }}</button>
+          <button @click.prevent="runAction(route('scenes.hlookat180'), { municipal:true, label:'hlookat 180', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 180?` })" :disabled="busy === 'hlookat 180'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#1d4ed8; color:#fff; cursor:pointer;">{{ busy === 'hlookat 180' ? 'Working…' : '🔭 hlookat 180' }}</button>
+          <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 0?` })" :disabled="busy === 'hlookat 0'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">{{ busy === 'hlookat 0' ? 'Working…' : '🔭 hlookat 0' }}</button>
+          <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni', confirmMsg:'Rewrite the topni layer in ALL tour.xml files (every municipality + province)? This affects the whole province.' })" :disabled="busy === 'Fixed Topni'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">{{ busy === 'Fixed Topni' ? 'Working…' : '🧱 Fixed Topni' }}</button>
+          <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs', confirmMsg:'Add the lay_ prefix AND backfill categories/iscategory on thumbnails in ALL 44 municipalities? This rewrites every tour.xml under cebu/.' })" :disabled="busy === 'Add lay_ to Thumbs'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">{{ busy === 'Add lay_ to Thumbs' ? 'Working…' : '🏷️ Add lay_' }}</button>
+          <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour', confirmMsg:'Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality?' })" :disabled="busy === 'Inject to Cebu Tour'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">{{ busy === 'Inject to Cebu Tour' ? 'Working…' : '🏙️ Inject to Cebu' }}</button>
         </div>
       </header>
 
