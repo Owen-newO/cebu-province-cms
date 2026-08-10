@@ -36,6 +36,17 @@ class SceneController extends Controller
         return $this->municipalSlug($user->role);
     }
 
+    // Maintenance actions are hit two ways: the municipal dashboard (Inertia,
+    // wants a redirect + flash) and the admin dashboard (fetch/XHR, wants JSON
+    // so it can show the real result count). Return the right shape for each.
+    private function actionResponse(string $message, array $extra = [])
+    {
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json(array_merge(['message' => $message], $extra));
+        }
+        return back()->with('success', $message);
+    }
+
     private function extractIframeSrc($iframeHtml)
     {
         if (!$iframeHtml) return null;
@@ -1803,20 +1814,20 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     }
 
     // =====================================================================
-    // ADD "lay_" PREFIX + CATEGORIES TO MUNICIPAL THUMBNAILS (S3, all tours)
+    // ADD "lay_" PREFIX TO MUNICIPAL THUMBNAILS (all municipal tours, S3)
     // =====================================================================
-    // Migration for existing scenes: for every municipal thumbnail (the layers
-    // with isFilterbrgy="true") it (1) prefixes the name with "lay_" (e.g.
-    // name="Shipwreck" -> "lay_Shipwreck") and (2) backfills categories="{cat}"
-    // and iscategory="true" from the DB, matched via linkedscene="scene_{id}".
-    // The cebu province rail (isFiltermuni) and other layers are untouched.
-    // Idempotent: already-prefixed names are skipped and categories are updated
-    // in place; iscategory is only set when the scene has a category.
+    // Prefixes each MUNICIPAL thumbnail name with "lay_" (e.g. name="Shipwreck"
+    // -> "lay_Shipwreck") across every municipal tour.xml. Municipal thumbnails
+    // are the ONLY layers with isFilterbrgy="true", so the province cebu rail
+    // (isFiltermuni — already named lay_{municipal}_{title} by "Inject to Cebu")
+    // and all other layers are untouched. No category work here. Idempotent:
+    // names already starting with lay_ are skipped.
     public function addLayPrefixToThumbs()
     {
         $disk = Storage::disk('s3');
 
-        // Every tour.xml: province root + one per top-level folder.
+        // Every tour.xml: province root + one per top-level folder. The root
+        // (cebu/tour.xml) has no isFilterbrgy layers, so it's naturally skipped.
         $keys = [];
         if ($disk->exists('tour.xml')) {
             $keys[] = 'tour.xml';
@@ -1828,19 +1839,9 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             }
         }
 
-        // Build a sceneId => category map from the DB so each thumbnail can be
-        // backfilled with its category (matched via linkedscene="scene_{sceneId}").
-        $catBySceneId = [];
-        foreach (Scene::all(['panorama_path', 'category']) as $s) {
-            $sid = pathinfo(parse_url($s->panorama_path ?? '', PHP_URL_PATH) ?: ($s->panorama_path ?? ''), PATHINFO_FILENAME);
-            if ($sid !== '') {
-                $catBySceneId[$sid] = (string) ($s->category ?? '');
-            }
-        }
-
-        $scanned      = 0;
-        $filesChanged = 0;
-        $layersTouched = 0;
+        $scanned        = 0;
+        $filesChanged   = 0;
+        $layersPrefixed = 0;
 
         foreach ($keys as $key) {
             $scanned++;
@@ -1851,54 +1852,24 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
 
             $count = 0;
 
-            // For each thumbnail opening tag (carries isFilterbrgy="true"):
-            //   1) prefix name with lay_ (unless already prefixed)
-            //   2) backfill categories="{cat}" + iscategory="true" from the DB
+            // Match each municipal thumbnail opening tag (isFilterbrgy="true")
+            // and prefix its name with lay_ unless it already has it.
             $new = preg_replace_callback(
                 '/<layer\b[^>]*\bisFilterbrgy="true"[^>]*>/i',
-                function ($m) use (&$count, $catBySceneId) {
-                    $tag     = $m[0];
-                    $changed = false;
-
-                    // 1) lay_ prefix on the name
-                    $tag = preg_replace_callback(
+                function ($m) use (&$count) {
+                    return preg_replace_callback(
                         '/\bname="([^"]*)"/i',
-                        function ($nm) use (&$changed) {
+                        function ($nm) use (&$count) {
                             $name = $nm[1];
                             if (stripos($name, 'lay_') === 0) {
-                                return 'name="' . $name . '"';
+                                return 'name="' . $name . '"'; // already prefixed
                             }
-                            $changed = true;
+                            $count++;
                             return 'name="lay_' . $name . '"';
                         },
-                        $tag,
+                        $m[0],
                         1
                     );
-
-                    // 2) categories + iscategory from linkedscene => sceneId
-                    if (preg_match('/\blinkedscene="scene_([^"]*)"/i', $tag, $lm)) {
-                        $sid = $lm[1];
-                        $cat = $catBySceneId[$sid] ?? null;
-                        if ($cat !== null && trim($cat) !== '') {
-                            $safeCat = htmlspecialchars($cat, ENT_QUOTES);
-                            if (preg_match('/\bcategories="[^"]*"/i', $tag)) {
-                                $tag = preg_replace('/\bcategories="[^"]*"/i', 'categories="' . $safeCat . '"', $tag, 1);
-                            } else {
-                                $tag = preg_replace('/^<layer\b/i', '<layer categories="' . $safeCat . '"', $tag, 1);
-                            }
-                            if (!preg_match('/\biscategory="true"/i', $tag)) {
-                                $tag = preg_match('/\biscategory="[^"]*"/i', $tag)
-                                    ? preg_replace('/\biscategory="[^"]*"/i', 'iscategory="true"', $tag, 1)
-                                    : preg_replace('/^<layer\b/i', '<layer iscategory="true"', $tag, 1);
-                            }
-                            $changed = true;
-                        }
-                    }
-
-                    if ($changed) {
-                        $count++;
-                    }
-                    return $tag;
                 },
                 $xml
             );
@@ -1906,19 +1877,19 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             if ($new !== null && $count > 0 && $new !== $xml) {
                 $disk->put($key, $new);
                 $filesChanged++;
-                $layersTouched += $count;
+                $layersPrefixed += $count;
             }
         }
 
-        Log::info('🏷️ Added lay_ prefix + categories to municipal thumbnails (S3)', [
-            'scanned'       => $scanned,
-            'files_changed' => $filesChanged,
-            'layers'        => $layersTouched,
+        Log::info('🏷️ Added lay_ prefix to municipal thumbnails (S3)', [
+            'scanned'        => $scanned,
+            'files_changed'  => $filesChanged,
+            'layers_renamed' => $layersPrefixed,
         ]);
 
-        return back()->with(
-            'success',
-            "Updated {$layersTouched} thumbnail(s) (lay_ + categories) across {$filesChanged} tour.xml file(s)."
+        return $this->actionResponse(
+            "Prefixed {$layersPrefixed} municipal thumbnail(s) with lay_ across {$filesChanged} tour.xml file(s).",
+            ['layers' => $layersPrefixed, 'files_changed' => $filesChanged]
         );
     }
 
@@ -1934,12 +1905,15 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
             $count = $pipeline->rebuildCebuThumbnails();
         } catch (\Throwable $e) {
             Log::error('❌ cebu/tour.xml injection failed', ['error' => $e->getMessage()]);
+            if (request()->wantsJson() || request()->ajax()) {
+                return response()->json(['message' => 'Inject failed: ' . $e->getMessage()], 500);
+            }
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with(
-            'success',
-            "Injected {$count} published scene thumbnail(s) into cebu/tour.xml."
+        return $this->actionResponse(
+            "Injected {$count} published scene thumbnail(s) into cebu/tour.xml.",
+            ['thumbnails' => $count]
         );
     }
 }
