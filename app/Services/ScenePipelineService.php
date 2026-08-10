@@ -211,6 +211,9 @@ class ScenePipelineService
             $safeTitle     = htmlspecialchars($title, ENT_QUOTES);
             $safeText      = htmlspecialchars(ucfirst(strtolower(str_replace('_', ' ', $title))), ENT_QUOTES);
             $municipalName = htmlspecialchars(ucwords(strtolower(trim((string) $scene->municipal))), ENT_QUOTES);
+            $category      = (string) ($scene->category ?? '');
+            $safeCategory  = htmlspecialchars($category, ENT_QUOTES);
+            $isCategoryAttr = trim($category) !== '' ? ' iscategory="true"' : '';
             $thumbUrl      = "{$municipalSlug}/{$sceneId}/panos/{$sceneId}.tiles/thumb.jpg";
 
             $thumbs .= "
@@ -220,7 +223,7 @@ class ScenePipelineService
     width.desktop=\"99%\" width.mobile=\"99%\" width.tablet=\"320\" height=\"prop\"
     bgcolor=\"0xffffff\" bgroundedge=\"35\" alpha=\"1\" bgalpha=\"1\" flowspacing=\"5\"
     keep=\"true\" scale=\".495\" isFiltermuni=\"true\" linkedscene=\"scene_{$sceneId}\"
-    municipal=\"{$municipalName}\" enabled=\"true\" onclick=\"jscall(window.location.href='https://www.mata.ph/cebu/{$municipalSlug}/index.html?startscene=scene_{$sceneId}');\" ispublished=\"true\">
+    municipal=\"{$municipalName}\" enabled=\"true\" onclick=\"jscall(window.location.href='https://www.mata.ph/cebu/{$municipalSlug}/index.html?startscene=scene_{$sceneId}');\" ispublished=\"true\" categories=\"{$safeCategory}\"{$isCategoryAttr}>
     <layer name=\"text_{$municipalSlug}_{$safeTitle}\" type=\"text\" text=\"{$safeText}\" width=\"100%\" autoheight=\"true\"
         align=\"bottom\" bgcolor=\"0x000000\" bgalpha=\"0\"
         css=\"color:#FFFFFF; font-size:300%; font-family:Chewy; padding-left:20px; text-align:bottom;\"/>
