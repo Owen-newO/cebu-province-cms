@@ -10,6 +10,16 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        // Super-admin — lands on the LGU invitation/application dashboard (/superadmin).
+        User::updateOrCreate(
+            ['email' => 'superadmin@mata.cms'],
+            [
+                'name'     => 'MATA Super Admin',
+                'password' => Hash::make('mataSUPERadmin'),
+                'role'     => 'super-admin',
+            ]
+        );
+
         // Province-wide admin — lands on the MATA ADMIN DASHBOARD (/admin).
         User::updateOrCreate(
             ['email' => 'admin@mata.cms'],

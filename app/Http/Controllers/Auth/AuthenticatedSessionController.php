@@ -13,7 +13,10 @@ class AuthenticatedSessionController extends Controller
 {
     public function create()
     {
-        return Inertia::render('Auth/Login');
+        return Inertia::render('Auth/Login', [
+            'status'      => session('status'),
+            'googleError' => session('google_error'),
+        ]);
     }
 
     public function store(Request $request)

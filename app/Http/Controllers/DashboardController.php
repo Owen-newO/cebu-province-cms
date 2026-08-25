@@ -16,6 +16,11 @@ class DashboardController extends Controller
             return redirect()->route('admin');
         }
 
+        // Super-admins land on the LGU invitation/application dashboard.
+        if (strtolower($user->role ?? '') === 'super-admin') {
+            return redirect()->route('superadmin');
+        }
+
         // Normalize municipal
         $municipal = strtolower($user->role);
 
