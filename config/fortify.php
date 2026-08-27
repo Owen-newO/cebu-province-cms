@@ -144,7 +144,10 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Features::registration(), // disabled: invite-only. Accounts are created
+        // by a super-admin (LGU invitation/approval flow), seeded directly, or
+        // via Tinker — never self-registered. Google login only matches an
+        // EXISTING account by email; it never creates one.
         Features::resetPasswords(),
         // Features::emailVerification(),
         Features::updateProfileInformation(),
