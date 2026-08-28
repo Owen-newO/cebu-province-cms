@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invitation;
 use App\Models\LguApplication;
+use App\Models\Scene;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -76,10 +77,70 @@ class SuperAdminController extends Controller
                 'reviewed_by'          => $app->reviewer?->name,
             ]);
 
+        $pendingCount  = $applications->where('status', 'pending')->count();
+        $activeInvites = $invitations->where('status', 'active')->count();
+        $publishedScenes = Scene::where('is_published', 1)->count();
+
+        $stats = [
+            ['label' => 'Municipalities Live', 'value' => count($approvedSlugs)],
+            ['label' => 'Pending Applications', 'value' => $pendingCount],
+            ['label' => 'Published Scenes', 'value' => $publishedScenes],
+            ['label' => 'Active Invite Links', 'value' => $activeInvites],
+        ];
+
+        // ---- Overview tab: one row per municipality --------------------
+        $sceneCounts = Scene::selectRaw('LOWER(municipal) as municipal, COUNT(*) as total, SUM(is_published) as published')
+            ->groupBy('municipal')
+            ->get()
+            ->keyBy('municipal');
+
+        // Latest application per municipality (so a re-applied/declined
+        // history still shows the most recent outcome, not a stale one).
+        $latestApplicationBySlug = LguApplication::query()
+            ->latest()
+            ->get()
+            ->groupBy('municipal_slug')
+            ->map(fn ($group) => $group->first()->status);
+
+        $municipalityOverview = collect($municipalities)->map(function ($name, $slug) use ($approvedSlugs, $latestApplicationBySlug, $sceneCounts) {
+            $counts = $sceneCounts->get($slug);
+            return [
+                'slug'          => $slug,
+                'name'          => $name,
+                'registered'    => in_array($slug, $approvedSlugs, true),
+                'latestStatus'  => $latestApplicationBySlug->get($slug), // pending|approved|declined|null
+                'totalScenes'   => $counts->total ?? 0,
+                'publishedScenes' => (int) ($counts->published ?? 0),
+            ];
+        })->values();
+
+        // A lightweight, real activity feed built from the two tables we
+        // actually have — no separate activity-log table exists (or is
+        // needed) for this.
+        $activity = collect()
+            ->concat($invitations->map(fn ($inv) => [
+                'text' => "Invitation link generated for {$inv['municipal_name']}",
+                'at'   => $inv['created_at'],
+            ]))
+            ->concat($applications->map(fn ($app) => [
+                'text' => match ($app['status']) {
+                    'approved' => "{$app['municipal_name']}'s application was approved",
+                    'declined' => "{$app['municipal_name']}'s application was declined",
+                    default    => "{$app['municipal_name']} submitted an application",
+                },
+                'at' => $app['reviewed_at'] ?? $app['submitted_at'],
+            ]))
+            ->sortByDesc('at')
+            ->take(6)
+            ->values();
+
         return Inertia::render('SuperAdminDashboard', [
-            'municipalities' => $municipalityOptions,
-            'invitations'    => $invitations,
-            'applications'   => $applications,
+            'municipalities'       => $municipalityOptions,
+            'invitations'          => $invitations,
+            'applications'         => $applications,
+            'stats'                => $stats,
+            'activity'             => $activity,
+            'municipalityOverview' => $municipalityOverview,
         ]);
     }
 
