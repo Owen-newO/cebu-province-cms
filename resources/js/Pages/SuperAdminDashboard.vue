@@ -227,6 +227,20 @@ const loadScenes = async () => {
     scenesLoading.value = false;
   }
 };
+
+// Group scenes sharing the same title into one card (same convention as
+// the municipal admin dashboard's own scene list).
+const groupedScenes = computed(() => {
+  const grouped = {};
+  scenesList.value.forEach((scene) => {
+    const title = scene.title?.trim() || "Untitled";
+    if (!grouped[title]) grouped[title] = { title, cover: scene, items: [scene] };
+    else grouped[title].items.push(scene);
+  });
+  return Object.values(grouped);
+});
+
+const openGroup = ref(null); // the group currently shown in the "view" modal
 </script>
 
 <template>
@@ -532,11 +546,15 @@ const loadScenes = async () => {
             <div v-if="scenesLoading" style="text-align:center; padding:24px; font-size:13px; color:#9ca3af;">Loading…</div>
             <div v-else-if="!scenesList.length" style="text-align:center; padding:24px; font-size:13px; color:#9ca3af;">No scenes found for this municipality.</div>
             <div v-else style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:14px;">
-              <div v-for="scene in scenesList" :key="scene.id" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
-                <img :src="getImageUrl(getThumbnail(scene.panorama_path))" :alt="scene.title" style="width:100%; height:110px; object-fit:cover; display:block; background:#f3f4f6;" />
+              <div v-for="group in groupedScenes" :key="group.title" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; position:relative;">
+                <img :src="getImageUrl(getThumbnail(group.cover.panorama_path))" :alt="group.title" style="width:100%; height:110px; object-fit:cover; display:block; background:#f3f4f6;" />
+                <span v-if="group.items.length > 1" style="position:absolute; top:8px; right:8px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(5,46,26,.75); color:#fff;">×{{ group.items.length }}</span>
                 <div style="padding:8px 10px;">
-                  <div style="font-size:12px; font-weight:600; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ scene.title }}</div>
-                  <span :style="`display:inline-block; margin-top:4px; font-size:10px; font-weight:600; padding:2px 8px; border-radius:999px; background:${scene.is_published ? '#f0fdf4' : '#f3f4f6'}; color:${scene.is_published ? '#15803d' : '#6b7280'};`">{{ scene.is_published ? "Published" : "Draft" }}</span>
+                  <div style="font-size:12px; font-weight:600; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ group.title }}</div>
+                  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:6px;">
+                    <span :style="`font-size:10px; font-weight:600; padding:2px 8px; border-radius:999px; background:${group.cover.is_published ? '#f0fdf4' : '#f3f4f6'}; color:${group.cover.is_published ? '#15803d' : '#6b7280'};`">{{ group.items.length > 1 ? group.items.length + " scenes" : (group.cover.is_published ? "Published" : "Draft") }}</span>
+                    <button v-if="group.items.length > 1" type="button" @click="openGroup = group" style="font-size:11px; font-weight:600; padding:4px 10px; border:1px solid #e5e7eb; border-radius:6px; background:#fff; color:#15803d; cursor:pointer;">View</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -544,5 +562,21 @@ const loadScenes = async () => {
         </template>
       </div>
     </main>
+
+    <!-- GROUPED SCENES MODAL -->
+    <div v-if="openGroup" @click.self="openGroup = null" style="position:fixed; inset:0; background:rgba(15,23,42,.5); display:flex; align-items:center; justify-content:center; z-index:1000; padding:24px;">
+      <div style="background:#fff; border-radius:12px; padding:24px; width:100%; max-width:620px; max-height:80vh; overflow-y:auto; position:relative;">
+        <button @click="openGroup = null" style="position:absolute; top:16px; right:16px; border:none; background:none; font-size:18px; cursor:pointer; color:#9ca3af;">✕</button>
+        <div style="font-size:15px; font-weight:700; color:#111827; margin-bottom:14px;">{{ openGroup.title }} <span style="font-weight:500; color:#9ca3af; font-size:13px;">({{ openGroup.items.length }} scenes)</span></div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:12px;">
+          <div v-for="scene in openGroup.items" :key="scene.id" style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+            <img :src="getImageUrl(getThumbnail(scene.panorama_path))" :alt="scene.title" style="width:100%; height:100px; object-fit:cover; display:block; background:#f3f4f6;" />
+            <div style="padding:6px 8px;">
+              <span :style="`font-size:10px; font-weight:600; padding:2px 8px; border-radius:999px; background:${scene.is_published ? '#f0fdf4' : '#f3f4f6'}; color:${scene.is_published ? '#15803d' : '#6b7280'};`">{{ scene.is_published ? "Published" : "Draft" }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
