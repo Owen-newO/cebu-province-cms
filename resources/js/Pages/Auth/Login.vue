@@ -62,36 +62,6 @@ const submit = () => {
                     />
                 </div>
 
-                <!-- Google Sign-in -->
-                <a
-                    :href="route('auth.google.redirect')"
-                    style="
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 10px;
-                        width: 100%;
-                        padding: 10px;
-                        border: 1px solid #d1d5db;
-                        border-radius: 6px;
-                        background: #fff;
-                        color: #374151;
-                        font-weight: 600;
-                        font-size: 14px;
-                        text-decoration: none;
-                        margin-bottom: 20px;
-                    "
-                >
-                    <img src="https://developers.google.com/identity/images/g-logo.png" alt="" style="width: 18px; height: 18px;" />
-                    Continue with Google
-                </a>
-
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-                    <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
-                    <span style="font-size: 12px; color: #9ca3af;">OR</span>
-                    <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
-                </div>
-
                 <!-- Email -->
                 <div>
                     <InputLabel for="email" value="Email" />
@@ -189,6 +159,35 @@ const submit = () => {
                         Login
                     </PrimaryButton>
                 </div>
+
+                <div style="display: flex; align-items: center; gap: 12px; margin-top: 20px; margin-bottom: 20px;">
+                    <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
+                    <span style="font-size: 12px; color: #9ca3af;">OR</span>
+                    <div style="flex: 1; height: 1px; background: #e5e7eb;"></div>
+                </div>
+
+                <!-- Google Sign-in -->
+                <a
+                    :href="route('auth.google.redirect')"
+                    style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        background: #fff;
+                        color: #374151;
+                        font-weight: 600;
+                        font-size: 14px;
+                        text-decoration: none;
+                    "
+                >
+                    <img src="https://developers.google.com/identity/images/g-logo.png" alt="" style="width: 18px; height: 18px;" />
+                    Continue with Google
+                </a>
             </form>
         </AuthenticationCard>
     </div>
