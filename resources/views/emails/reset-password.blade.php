@@ -15,7 +15,7 @@
                     <!-- Banner -->
                     <tr>
                         <td style="background:#15803d; background:linear-gradient(150deg,#15803d,#0e5f2d); padding:30px 40px 26px;">
-                            <div style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; font-size:30px; letter-spacing:3px; color:#ffffff;">MATA</div>
+                            <div style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; font-size:30px; letter-spacing:1.5px; color:#ffffff;">Virtual Maps</div>
                             <div style="font-size:12px; letter-spacing:3px; text-transform:uppercase; color:#cfe6d6; margin-top:7px;">Cebu Province &middot; Virtual Tours</div>
                         </td>
                     </tr>
@@ -80,7 +80,7 @@
                     <!-- Footer -->
                     <tr>
                         <td style="background:#eef6f0; border-top:1px solid #e4e9e5; padding:22px 40px; color:#5f6b64; font-size:12.5px; line-height:1.65;">
-                            <span style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; color:#1b2420; letter-spacing:1px;">MATA</span> &middot; Cebu Province Virtual Tours<br>
+                            <span style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; color:#1b2420; letter-spacing:1px;">Virtual Maps</span> &middot; Cebu Province Virtual Tours<br>
                             <span style="color:#8b968f;">You received this because an administrator approved your access. If this wasn&rsquo;t expected, you can safely ignore this email.</span>
                         </td>
                     </tr>
