@@ -1894,6 +1894,94 @@ public function update(Request $request, $id, ScenePipelineService $pipeline)
     }
 
     // =====================================================================
+    // FIX "checkhtgt" IN EVERY modal.xml (mobile: disable instead of hide, S3)
+    // =====================================================================
+    // Rewrites the checkhtgt action in every municipality's modal.xml so that,
+    // when a scene has no how_to_get_there, the "How to get there" button (htgt)
+    // stays VISIBLE but disabled (dimmed) on MOBILE instead of being hidden.
+    // Desktop/tablet keep hiding it. Matches whatever the old action body was,
+    // so it's safe to run on already-updated files (idempotent by content).
+    public function fixModalHtgt()
+    {
+        $disk = Storage::disk('s3');
+
+        $newAction = <<<'XML'
+<action name="checkhtgt">
+    if(isvalue(scene[get(xml.scene)].how_to_get_there),
+        <!-- has directions: shown and clickable -->
+        set(layer[htgt].visible, true);
+        set(layer[htgt].enabled, true);
+        set(layer[htgt].alpha, 1);
+    ,
+        if(device.mobile,
+            <!-- mobile + no directions: keep it visible but unclickable (dimmed) -->
+            set(layer[htgt].visible, true);
+            set(layer[htgt].enabled, false);
+            set(layer[htgt].alpha, 0.4);
+        ,
+            <!-- desktop / tablet: hide as before -->
+            set(layer[htgt].visible, false);
+            set(layer[htgt].enabled, true);
+            set(layer[htgt].alpha, 1);
+        );
+    );
+</action>
+XML;
+
+        // Match the whole checkhtgt action, whatever its current body is.
+        $pattern = '/<action\b[^>]*\bname="checkhtgt"[^>]*>.*?<\/action>/is';
+
+        // Every modal.xml: province root + one per top-level folder.
+        $keys = [];
+        if ($disk->exists('modal.xml')) {
+            $keys[] = 'modal.xml';
+        }
+        foreach ($disk->directories('') as $dir) {
+            $key = trim($dir, '/') . '/modal.xml';
+            if ($disk->exists($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        $scanned = 0;
+        $changed = 0;
+        $missing = 0;
+
+        foreach ($keys as $key) {
+            $scanned++;
+            $xml = $disk->get($key);
+            if ($xml === null) {
+                continue;
+            }
+
+            if (!preg_match($pattern, $xml)) {
+                $missing++; // no checkhtgt action in this modal.xml
+                continue;
+            }
+
+            // Callback replacement so the new body is inserted literally
+            // (no $/\ backreference surprises).
+            $new = preg_replace_callback($pattern, fn () => $newAction, $xml, 1, $count);
+
+            if ($new !== null && $count > 0 && $new !== $xml) {
+                $disk->put($key, $new);
+                $changed++;
+            }
+        }
+
+        Log::info('🧭 checkhtgt updated across modal.xml files (S3)', [
+            'scanned'      => $scanned,
+            'changed'      => $changed,
+            'no_checkhtgt' => $missing,
+        ]);
+
+        return $this->actionResponse(
+            "Updated checkhtgt in {$changed} modal.xml file(s) ({$scanned} scanned, {$missing} had no checkhtgt).",
+            ['changed' => $changed, 'scanned' => $scanned, 'missing' => $missing]
+        );
+    }
+
+    // =====================================================================
     // PROVINCE (cebu/tour.xml) — INJECT ALL PUBLISHED SCENE THUMBNAILS (button)
     // =====================================================================
     // Manual "Inject to Cebu Tour" trigger. The actual rebuild lives in

@@ -39,11 +39,30 @@ class SuperAdminController extends Controller
             ->unique()
             ->all();
 
-        $municipalityOptions = collect($municipalities)->map(function ($name, $slug) use ($approvedSlugs) {
+        // A municipality is "taken" (can't be invited again) when it already has
+        // an active or already-used invite, or an existing user account.
+        $busyInviteSlugs = Invitation::whereNull('deactivated_at')
+            ->where(fn ($q) => $q->whereNotNull('used_at')->orWhere('expires_at', '>', now()))
+            ->pluck('municipal_slug')
+            ->map(fn ($s) => strtolower(trim((string) $s)))
+            ->unique()
+            ->all();
+
+        $accountSlugs = User::pluck('role')
+            ->map(fn ($r) => strtolower(trim((string) $r)))
+            ->unique()
+            ->all();
+
+        $municipalityOptions = collect($municipalities)->map(function ($name, $slug) use ($approvedSlugs, $busyInviteSlugs, $accountSlugs) {
+            $registered = in_array($slug, $approvedSlugs, true);
             return [
-                'slug'              => $slug,
-                'name'              => $name,
-                'already_registered' => in_array($slug, $approvedSlugs, true),
+                'slug'               => $slug,
+                'name'               => $name,
+                'already_registered' => $registered,
+                // Unclickable in the invite picker when any of these are true.
+                'taken'              => $registered
+                    || in_array($slug, $busyInviteSlugs, true)
+                    || in_array($slug, $accountSlugs, true),
             ];
         })->values();
 
@@ -154,8 +173,23 @@ class SuperAdminController extends Controller
             'municipal_slug' => ['required', 'string'],
         ]);
 
-        if (!array_key_exists($validated['municipal_slug'], config('municipalities', []))) {
+        $slug = $validated['municipal_slug'];
+
+        if (!array_key_exists($slug, config('municipalities', []))) {
             return back()->with('error', 'Unknown municipality.');
+        }
+
+        // Refuse to invite a municipality that is already taken: an existing
+        // account, an approved application, or an outstanding/used invite.
+        $hasAccount = User::whereRaw('LOWER(role) = ?', [strtolower($slug)])->exists();
+        $hasApproved = LguApplication::where('municipal_slug', $slug)->where('status', 'approved')->exists();
+        $hasBusyInvite = Invitation::where('municipal_slug', $slug)
+            ->whereNull('deactivated_at')
+            ->where(fn ($q) => $q->whereNotNull('used_at')->orWhere('expires_at', '>', now()))
+            ->exists();
+
+        if ($hasAccount || $hasApproved || $hasBusyInvite) {
+            return back()->with('error', 'That municipality is already taken (it has an account or an active invite).');
         }
 
         // bin2hex(random_bytes(6)) => 12-char hex token.

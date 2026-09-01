@@ -507,7 +507,7 @@ const openGroup = ref(null); // the group currently shown in the "view" modal
               <label style="display:block; margin:14px 0 6px; font-size:12px; font-weight:600;">Municipality</label>
               <select v-model="selectedMunicipal" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:13px; background:#fff; color:#111827; font-family:inherit;">
                 <option value="">Select a municipality</option>
-                <option v-for="m in sortedMunicipalities" :key="m.slug" :value="m.slug">{{ m.name }}{{ m.already_registered ? " (already registered)" : "" }}</option>
+                <option v-for="m in sortedMunicipalities" :key="m.slug" :value="m.slug" :disabled="m.taken">{{ m.name }}{{ m.already_registered ? " (already registered)" : (m.taken ? " (taken)" : "") }}</option>
               </select>
 
               <button
