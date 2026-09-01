@@ -106,6 +106,16 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+// Self-service password reset via 6-digit email code (OTP)
+Route::middleware('guest')->group(function () {
+    Route::post('/reset/code', [App\Http\Controllers\Auth\OtpPasswordResetController::class, 'sendCode'])
+        ->name('otp.code');
+    Route::post('/reset/verify', [App\Http\Controllers\Auth\OtpPasswordResetController::class, 'verifyCode'])
+        ->name('otp.verify');
+    Route::post('/reset/complete', [App\Http\Controllers\Auth\OtpPasswordResetController::class, 'complete'])
+        ->name('otp.complete');
+});
+
 // ✅ Barangay Dashboards
 // Route::get('/dashboard/Xq1f4Psl3Smbn', fn() => Inertia::render('Dashboards/Dashboardsamboan'))->name('Dashboard.samboan');
 // Route::get('/dashboard/Q9zG8Htl0Oslb', fn() => Inertia::render('Dashboards/Dashboardoslob'))->name('Dashboard.oslob');
