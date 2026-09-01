@@ -1,7 +1,6 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
 import AuthenticationCard from '@/Components/AuthenticationCard.vue';
-import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
@@ -29,57 +28,122 @@ const submit = () => {
 <template>
     <Head title="Reset Password" />
 
-    <AuthenticationCard>
-        <template #logo>
-            <AuthenticationCardLogo />
-        </template>
+    <div
+        style="
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f3f4f6;
+            padding: 20px;
+        "
+    >
+        <AuthenticationCard>
+            <form @submit.prevent="submit" style="width: 100%; max-width: 420px; min-width: 350px;">
+                <!-- Logo -->
+                <div style="display: flex; justify-content: center; margin-bottom: 24px;">
+                    <img
+                        src="/images/logo.png"
+                        alt="Suroy Cebu"
+                        style="width: 200px; height: 180px; display: block; margin: 0 auto;"
+                    />
+                </div>
 
-        <form @submit.prevent="submit">
-            <div>
-                <InputLabel for="email" value="Email" />
-                <TextInput
-                    id="email"
-                    v-model="form.email"
-                    type="email"
-                    class="mt-1 block w-full"
-                    required
-                    autofocus
-                    autocomplete="username"
-                />
-                <InputError class="mt-2" :message="form.errors.email" />
-            </div>
+                <!-- Email -->
+                <div>
+                    <InputLabel for="email" value="Email" />
+                    <TextInput
+                        id="email"
+                        v-model="form.email"
+                        type="email"
+                        required
+                        autofocus
+                        autocomplete="username"
+                        style="
+                            margin-top: 4px;
+                            display: block;
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #d1d5db;
+                            border-radius: 6px;
+                            outline: none;
+                        "
+                    />
+                    <InputError style="margin-top: 8px;" :message="form.errors.email" />
+                </div>
 
-            <div class="mt-4">
-                <InputLabel for="password" value="Password" />
-                <TextInput
-                    id="password"
-                    v-model="form.password"
-                    type="password"
-                    class="mt-1 block w-full"
-                    required
-                    autocomplete="new-password"
-                />
-                <InputError class="mt-2" :message="form.errors.password" />
-            </div>
+                <!-- Password -->
+                <div style="margin-top: 16px;">
+                    <InputLabel for="password" value="Password" />
+                    <TextInput
+                        id="password"
+                        v-model="form.password"
+                        type="password"
+                        required
+                        autocomplete="new-password"
+                        style="
+                            margin-top: 4px;
+                            display: block;
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #d1d5db;
+                            border-radius: 6px;
+                            outline: none;
+                        "
+                    />
+                    <InputError style="margin-top: 8px;" :message="form.errors.password" />
+                </div>
 
-            <div class="mt-4">
-                <InputLabel for="password_confirmation" value="Confirm Password" />
-                <TextInput
-                    id="password_confirmation"
-                    v-model="form.password_confirmation"
-                    type="password"
-                    class="mt-1 block w-full"
-                    required
-                    autocomplete="new-password"
-                />
-                <InputError class="mt-2" :message="form.errors.password_confirmation" />
-            </div>
+                <!-- Confirm Password -->
+                <div style="margin-top: 16px;">
+                    <InputLabel for="password_confirmation" value="Confirm Password" />
+                    <TextInput
+                        id="password_confirmation"
+                        v-model="form.password_confirmation"
+                        type="password"
+                        required
+                        autocomplete="new-password"
+                        style="
+                            margin-top: 4px;
+                            display: block;
+                            width: 100%;
+                            padding: 10px;
+                            border: 1px solid #d1d5db;
+                            border-radius: 6px;
+                            outline: none;
+                        "
+                    />
+                    <InputError style="margin-top: 8px;" :message="form.errors.password_confirmation" />
+                </div>
 
-            <div class="flex items-center justify-end mt-4">
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
-                    Reset Password
-                </PrimaryButton>
-            </div>
-        </form>
-    </AuthenticationCard>
+                <!-- Action -->
+                <div
+                    style="
+                        display: flex;
+                        justify-content: flex-end;
+                        align-items: center;
+                        margin-top: 20px;
+                    "
+                >
+                    <PrimaryButton
+                        style="
+                            background-color: #2563eb;
+                            color: white;
+                            padding: 8px 20px;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            border: none;
+                            cursor: pointer;
+                            transition: opacity 0.2s;
+                        "
+                        :style="form.processing ? 'opacity:0.5;' : ''"
+                        :disabled="form.processing"
+                    >
+                        Reset Password
+                    </PrimaryButton>
+                </div>
+            </form>
+        </AuthenticationCard>
+    </div>
 </template>
