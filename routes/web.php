@@ -108,6 +108,9 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
 
 // Self-service password reset via 6-digit email code (OTP)
 Route::middleware('guest')->group(function () {
+    // Tokenless entry to the OTP reset page (from the login "Forgot password?" link)
+    Route::get('/reset-password', fn () => Inertia::render('Auth/ResetPassword'))
+        ->name('password.otp');
     Route::post('/reset/code', [App\Http\Controllers\Auth\OtpPasswordResetController::class, 'sendCode'])
         ->name('otp.code');
     Route::post('/reset/verify', [App\Http\Controllers\Auth\OtpPasswordResetController::class, 'verifyCode'])

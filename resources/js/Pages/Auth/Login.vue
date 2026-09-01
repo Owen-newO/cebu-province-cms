@@ -126,8 +126,7 @@ const submit = () => {
                 >
                     <!-- Forgot Password -->
                     <Link
-                        v-if="canResetPassword"
-                        :href="route('password.request')"
+                        :href="route('password.otp')"
                         style="
                             font-size: 14px;
                             color: #4b5563;
