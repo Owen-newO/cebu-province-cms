@@ -16,7 +16,7 @@
                     <tr>
                         <td style="background:#15803d; background:linear-gradient(150deg,#15803d,#0e5f2d); padding:30px 40px 26px;">
                             <div style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; font-size:30px; letter-spacing:1.5px; color:#ffffff;">Virtual Maps</div>
-                            <div style="font-size:12px; letter-spacing:3px; text-transform:uppercase; color:#cfe6d6; margin-top:7px;">Cebu Province &middot; Virtual Maps</div>
+                            <div style="font-size:12px; letter-spacing:3px; text-transform:uppercase; color:#cfe6d6; margin-top:7px;">Cebu Province </div>
                         </td>
                     </tr>
 
