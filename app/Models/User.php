@@ -65,4 +65,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    /**
+     * Send the branded MATA password-setup / reset email instead of Laravel's
+     * default notification.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new \App\Notifications\ResetPasswordBranded($token));
+    }
 }

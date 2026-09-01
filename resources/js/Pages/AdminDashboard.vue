@@ -21,6 +21,8 @@ const activeGroupCount = ref(0);
 const searchQuery = ref("");
 const loading = ref(false);
 const busy = ref("");
+// One-time bulk actions (Inject to Cebu, Fix HTGT). Set true to show them again.
+const showBulkTools = ref(false);
 const sceneModal = ref(null);
 const imageFailed = ref({});
 const imageCheckIntervals = {};
@@ -296,8 +298,10 @@ const logout = () => router.post(route("logout"));
           <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 0?` })" :disabled="busy === 'hlookat 0'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">{{ busy === 'hlookat 0' ? 'Working…' : '🔭 hlookat 0' }}</button>
           <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni', confirmMsg:'Rewrite the topni layer in ALL tour.xml files (every municipality + province)? This affects the whole province.' })" :disabled="busy === 'Fixed Topni'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">{{ busy === 'Fixed Topni' ? 'Working…' : '🧱 Fixed Topni' }}</button>
           <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs', confirmMsg:'Add the lay_ prefix to thumbnails in ALL municipal tour.xml files? (cebu/tour.xml is handled by Inject to Cebu.)' })" :disabled="busy === 'Add lay_ to Thumbs'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">{{ busy === 'Add lay_ to Thumbs' ? 'Working…' : '🏷️ Add lay_' }}</button>
+          <template v-if="showBulkTools">
           <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour', confirmMsg:'Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality?' })" :disabled="busy === 'Inject to Cebu Tour'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">{{ busy === 'Inject to Cebu Tour' ? 'Working…' : '🏙️ Inject to Cebu' }}</button>
           <button @click.prevent="runAction(route('scenes.fixModalHtgt'), { label:'Fix HTGT Button', confirmMsg:'Update the How-to-get-there button in ALL modal.xml files so it stays visible-but-disabled on mobile (instead of hidden) when a scene has no directions?' })" :disabled="busy === 'Fix HTGT Button'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0891b2; color:#fff; cursor:pointer;">{{ busy === 'Fix HTGT Button' ? 'Working…' : '🧭 Fix HTGT Button' }}</button>
+          </template>
         </div>
       </header>
 
