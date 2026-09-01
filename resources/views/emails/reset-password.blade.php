@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
-    <title>Cebu Province Virtual Tours</title>
+    <title>Cebu Province Virtual Maps</title>
 </head>
 <body style="margin:0; padding:0; background:#e7ece6;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#e7ece6;">
@@ -34,7 +34,7 @@
                             </h1>
 
                             <p style="font-size:15px; line-height:1.62; color:#5f6b64; margin:0 0 20px;">
-                                Your access to the Cebu Province Virtual Tour CMS has been approved. Set a password to start uploading and managing your 360&deg; scenes.
+                                Your access to the Cebu Province Virtual Maps CMS has been approved. Set a password to start uploading and managing your 360&deg; scenes.
                             </p>
 
                             <!-- Details -->
@@ -80,7 +80,7 @@
                     <!-- Footer -->
                     <tr>
                         <td style="background:#eef6f0; border-top:1px solid #e4e9e5; padding:22px 40px; color:#5f6b64; font-size:12.5px; line-height:1.65;">
-                            <span style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; color:#1b2420; letter-spacing:1px;">Virtual Maps</span> &middot; Cebu Province Virtual Tours<br>
+                            <span style="font-family:Georgia,'Times New Roman',serif; font-weight:bold; color:#1b2420; letter-spacing:1px;">Virtual Maps</span> &middot; Cebu Province Virtual Maps<br>
                             <span style="color:#8b968f;">You received this because an administrator approved your access. If this wasn&rsquo;t expected, you can safely ignore this email.</span>
                         </td>
                     </tr>
