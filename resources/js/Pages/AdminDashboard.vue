@@ -4,7 +4,7 @@ import { Head, router } from "@inertiajs/vue3";
 import addSceneModal from "./addSceneModal.vue";
 
 const props = defineProps({
-  municipalities: Object, // { slug: "Display Name" } — 44 municipalities
+  municipalities: Object, // { slug: "Display Name" } — 44 municipalities + 9 cities
   barangays: Object,      // { slug: ["Barangay ...", ...] }
 });
 
@@ -212,7 +212,7 @@ const publishScene = async (id) => {
 // ------------------------------------------------------------------
 const runAction = async (url, { municipal = false, label, confirmMsg }) => {
   if (municipal && !selectedMunicipal.value) {
-    alert("Select a municipality first.");
+    alert("Select an LGU first.");
     return;
   }
   if (!window.confirm(confirmMsg || `Run "${label}"?`)) return;
@@ -266,7 +266,7 @@ const logout = () => router.post(route("logout"));
         @change="selectMunicipal($event.target.value)"
         style="margin-top:8px; width:100%; padding:12px; border-radius:10px; border:1px solid #334155; background:#1e293b; color:#fff; font-size:15px;"
       >
-        <option value="">— Select municipality —</option>
+        <option value="">— Select LGU —</option>
         <option v-for="m in municipalOptions" :key="m.slug" :value="m.slug">{{ m.name }}</option>
       </select>
 
@@ -298,6 +298,7 @@ const logout = () => router.post(route("logout"));
           <button @click.prevent="runAction(route('scenes.hlookat0'), { municipal:true, label:'hlookat 0', confirmMsg:`Set ALL scene views in ${municipalDisplay} to hlookat 0?` })" :disabled="busy === 'hlookat 0'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#475569; color:#fff; cursor:pointer;">{{ busy === 'hlookat 0' ? 'Working…' : '🔭 hlookat 0' }}</button>
           <button @click.prevent="runAction(route('scenes.fixTopni'), { label:'Fixed Topni', confirmMsg:'Rewrite the topni layer in ALL tour.xml files (every municipality + province)? This affects the whole province.' })" :disabled="busy === 'Fixed Topni'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#b45309; color:#fff; cursor:pointer;">{{ busy === 'Fixed Topni' ? 'Working…' : '🧱 Fixed Topni' }}</button>
           <button @click.prevent="runAction(route('scenes.layPrefix'), { label:'Add lay_ to Thumbs', confirmMsg:'Add the lay_ prefix to thumbnails in ALL municipal tour.xml files? (cebu/tour.xml is handled by Inject to Cebu.)' })" :disabled="busy === 'Add lay_ to Thumbs'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#7c3aed; color:#fff; cursor:pointer;">{{ busy === 'Add lay_ to Thumbs' ? 'Working…' : '🏷️ Add lay_' }}</button>
+          <button @click.prevent="runAction(route('scenes.fixThumbText'), { label:'Fix Thumb Caption', confirmMsg:'Make the thumbnail caption click-through in ALL action.xml files (every municipality + province)? Right now the caption sits on top of its thumbnail and swallows clicks, so the bottom strip of every thumbnail does not load its scene. Safe to re-run.' })" :disabled="busy === 'Fix Thumb Caption'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#be123c; color:#fff; cursor:pointer;">{{ busy === 'Fix Thumb Caption' ? 'Working…' : '🖱️ Fix Thumb Caption' }}</button>
           <template v-if="showBulkTools">
           <button @click.prevent="runAction(route('scenes.injectCebu'), { label:'Inject to Cebu Tour', confirmMsg:'Rebuild the province cebu/tour.xml thumbnail rail from ALL published scenes across every municipality?' })" :disabled="busy === 'Inject to Cebu Tour'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#047857; color:#fff; cursor:pointer;">{{ busy === 'Inject to Cebu Tour' ? 'Working…' : '🏙️ Inject to Cebu' }}</button>
           <button @click.prevent="runAction(route('scenes.fixModalHtgt'), { label:'Fix HTGT Button', confirmMsg:'Update the How-to-get-there button in ALL modal.xml files so it stays visible-but-disabled on mobile (instead of hidden) when a scene has no directions?' })" :disabled="busy === 'Fix HTGT Button'" style="font-size:14px; padding:8px 16px; border-radius:20px; border:1px solid #d1d5db; background:#0891b2; color:#fff; cursor:pointer;">{{ busy === 'Fix HTGT Button' ? 'Working…' : '🧭 Fix HTGT Button' }}</button>
@@ -309,7 +310,7 @@ const logout = () => router.post(route("logout"));
       <section v-if="!selectedMunicipal" style="flex:1; display:flex; align-items:center; justify-content:center; text-align:center; color:#6b7280;">
         <div>
           <div style="font-size:60px; margin-bottom:12px;">🗺️</div>
-          <p style="font-size:20px; font-weight:600; color:#374151;">Select a municipality to begin</p>
+          <p style="font-size:20px; font-weight:600; color:#374151;">Select an LGU to begin</p>
           <p style="font-size:15px; margin-top:6px;">Use the <b>MUNICIPAL</b> dropdown on the left.</p>
         </div>
       </section>

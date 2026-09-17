@@ -1982,6 +1982,126 @@ XML;
     }
 
     // =====================================================================
+    // FIX "thumbadd" IN EVERY action.xml (caption must not eat clicks, S3)
+    // =====================================================================
+    // thumbadd builds the bottom thumbnail rail. For each thumb it also adds a
+    // caption layer (custom_thumbtext_N) as a CHILD of that thumb, parked over
+    // the thumb's bottom edge. krpano does not bubble mouse events from a child
+    // to its parent, and layers are enabled by default — so the caption, which
+    // has no onclick of its own, swallows every click that lands on it and the
+    // thumb's loadscene never fires. The bottom strip of every thumbnail (~25-45%
+    // of it, more when the subtitle wraps to two lines) is dead to the user.
+    //
+    // Fix: set enabled=false on the caption so clicks fall through to the thumb.
+    //
+    // Done as a surgical INSERT after the caption's .visible line, not as a
+    // whole-action rewrite: each action.xml holds TWO thumbadd actions
+    // (devices="desktop|tablet" and devices="mobile") with different sizes and
+    // fonts, and towns have drifted from one another — rewriting the body would
+    // flatten all of that. Idempotent by content: an action that already sets
+    // .enabled on its caption is left untouched, so re-running is a no-op.
+    public function fixThumbTextClickable()
+    {
+        $disk = Storage::disk('s3');
+
+        // Each <action ... name="thumbadd" ...> ... </action> block, whatever
+        // its devices attribute and body happen to be.
+        $actionPattern = '/<action\b[^>]*\bname="thumbadd"[^>]*>.*?<\/action>/is';
+
+        // The caption's visibility line — the anchor we insert after. Group 1
+        // captures its indentation so the inserted line aligns with neighbours.
+        $anchorPattern = '/^([ \t]*)(set\(layer\[get\(custom_thumbtext\)\]\.visible,\s*true\);)/mi';
+
+        // Single-quoted so the literal body is inserted as-is; ${1}/${2} are the
+        // backreferences (braced to keep them unambiguous next to letters).
+        $replacement = '${1}${2}' . "\n" . '${1}set(layer[get(custom_thumbtext)].enabled, false);';
+
+        // Every action.xml: province root + one per top-level municipality folder.
+        $keys = [];
+        if ($disk->exists('action.xml')) {
+            $keys[] = 'action.xml';
+        }
+        foreach ($disk->directories('') as $dir) {
+            $key = trim($dir, '/') . '/action.xml';
+            if ($disk->exists($key)) {
+                $keys[] = $key;
+            }
+        }
+
+        $scanned        = 0;
+        $changed        = 0;
+        $actionsPatched = 0;
+        $alreadyOk      = 0;
+        $missing        = 0;
+
+        foreach ($keys as $key) {
+            $scanned++;
+            $xml = $disk->get($key);
+            if ($xml === null) {
+                continue;
+            }
+
+            if (!preg_match($actionPattern, $xml)) {
+                $missing++; // no thumbadd action in this action.xml
+                continue;
+            }
+
+            $patchedHere = 0;
+            $skippedHere = 0;
+
+            $new = preg_replace_callback(
+                $actionPattern,
+                function (array $m) use ($anchorPattern, $replacement, &$patchedHere, &$skippedHere) {
+                    $action = $m[0];
+
+                    // Already fixed (previous run, or by hand) — leave it alone.
+                    if (preg_match('/layer\[get\(custom_thumbtext\)\]\.enabled/i', $action)) {
+                        $skippedHere++;
+                        return $action;
+                    }
+
+                    $out = preg_replace($anchorPattern, $replacement, $action, 1, $n);
+
+                    if ($out !== null && $n > 0) {
+                        $patchedHere++;
+                        return $out;
+                    }
+
+                    return $action; // no caption anchor in this one — nothing to do
+                },
+                $xml
+            );
+
+            $alreadyOk += $skippedHere;
+
+            if ($new !== null && $patchedHere > 0 && $new !== $xml) {
+                $disk->put($key, $new);
+                $changed++;
+                $actionsPatched += $patchedHere;
+            }
+        }
+
+        Log::info('🖱️ thumbadd caption made click-through across action.xml files (S3)', [
+            'scanned'         => $scanned,
+            'files_changed'   => $changed,
+            'actions_patched' => $actionsPatched,
+            'already_ok'      => $alreadyOk,
+            'no_thumbadd'     => $missing,
+        ]);
+
+        return $this->actionResponse(
+            "Caption made click-through in {$actionsPatched} thumbadd action(s) across {$changed} action.xml file(s) ({$scanned} scanned, {$alreadyOk} already fixed, {$missing} had no thumbadd).",
+            [
+                'scanned'         => $scanned,
+                'files_changed'   => $changed,
+                'actions_patched' => $actionsPatched,
+                'already_ok'      => $alreadyOk,
+                'missing'         => $missing,
+            ]
+        );
+    }
+
+    // =====================================================================
     // PROVINCE (cebu/tour.xml) — INJECT ALL PUBLISHED SCENE THUMBNAILS (button)
     // =====================================================================
     // Manual "Inject to Cebu Tour" trigger. The actual rebuild lives in

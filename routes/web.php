@@ -60,6 +60,8 @@ Route::middleware([
         ->name('scenes.layPrefix');
     Route::post('/scenes/fix-modal-htgt', [SceneController::class, 'fixModalHtgt'])
         ->name('scenes.fixModalHtgt');
+    Route::post('/scenes/fix-thumb-text', [SceneController::class, 'fixThumbTextClickable'])
+        ->name('scenes.fixThumbText');
     Route::get('/api/scenes', fn() => response()->json(App\Models\Scene::latest()->get()));
 
     // Scenes for one municipality. props.municipal is ucfirst'd (e.g. "Pilar")

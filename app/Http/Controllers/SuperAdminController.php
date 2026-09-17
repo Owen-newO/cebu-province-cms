@@ -101,7 +101,7 @@ class SuperAdminController extends Controller
         $publishedScenes = Scene::where('is_published', 1)->count();
 
         $stats = [
-            ['label' => 'Municipalities Live', 'value' => count($approvedSlugs)],
+            ['label' => 'LGUs Live', 'value' => count($approvedSlugs)],
             ['label' => 'Pending Applications', 'value' => $pendingCount],
             ['label' => 'Published Scenes', 'value' => $publishedScenes],
             ['label' => 'Active Invite Links', 'value' => $activeInvites],

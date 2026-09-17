@@ -13,7 +13,7 @@ class AdminController extends Controller
             return redirect()->route('Dashboard');
         }
 
-        // slug => Display name (44 municipalities).
+        // slug => Display name (44 municipalities + 9 cities).
         $municipalities = config('municipalities', []);
 
         // slug => [barangay names]. Only some municipalities have barangay data

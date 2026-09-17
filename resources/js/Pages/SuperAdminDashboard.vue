@@ -506,7 +506,7 @@ const openGroup = ref(null); // the group currently shown in the "view" modal
               <div style="font-size:11px; font-weight:600; letter-spacing:0.6px; text-transform:uppercase; color:#6b7280;">Generate Invitation</div>
               <label style="display:block; margin:14px 0 6px; font-size:12px; font-weight:600;">Municipality</label>
               <select v-model="selectedMunicipal" style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:13px; background:#fff; color:#111827; font-family:inherit;">
-                <option value="">Select a municipality</option>
+                <option value="">Select an LGU</option>
                 <option v-for="m in sortedMunicipalities" :key="m.slug" :value="m.slug" :disabled="m.taken">{{ m.name }}{{ m.already_registered ? " (already registered)" : (m.taken ? " (taken)" : "") }}</option>
               </select>
 
@@ -521,7 +521,7 @@ const openGroup = ref(null); // the group currently shown in the "view" modal
               </button>
               <div style="margin-top:10px; font-size:11.5px; color:#9ca3af; display:flex; gap:6px; align-items:flex-start;">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 13px; margin-top:1px;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
-                <span>{{ selectedMunicipal ? "Link is valid for 24 hours and can be used once." : "Select a municipality to generate an invitation link." }}</span>
+                <span>{{ selectedMunicipal ? "Link is valid for 24 hours and can be used once." : "Select an LGU to generate an invitation link." }}</span>
               </div>
             </div>
           </section>
@@ -532,13 +532,13 @@ const openGroup = ref(null); // the group currently shown in the "view" modal
           <section style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:18px 20px;">
             <div style="font-size:11px; font-weight:600; letter-spacing:0.6px; text-transform:uppercase; color:#6b7280; margin-bottom:10px;">360° Scenes</div>
             <select v-model="scenesMunicipal" @change="loadScenes" style="width:280px; max-width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:8px; font-size:13px; background:#fff; color:#111827; font-family:inherit;">
-              <option value="">Select a municipality</option>
+              <option value="">Select an LGU</option>
               <option v-for="m in sortedMunicipalities" :key="m.slug" :value="m.slug">{{ m.name }}</option>
             </select>
           </section>
 
           <section v-if="!scenesMunicipal" style="background:#fff; border:1px solid #e5e7eb; border-radius:8px; padding:44px 24px; text-align:center;">
-            <div style="font-size:13px; font-weight:600; color:#111827;">Select a municipality to view its scenes</div>
+            <div style="font-size:13px; font-weight:600; color:#111827;">Select an LGU to view its scenes</div>
             <div style="margin-top:4px; font-size:12px; color:#9ca3af;">Nothing loads until one is picked.</div>
           </section>
 
