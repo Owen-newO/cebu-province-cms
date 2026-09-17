@@ -209,7 +209,10 @@ class ScenePipelineService
             }
 
             $safeTitle     = htmlspecialchars($title, ENT_QUOTES);
-            $safeText      = htmlspecialchars(ucfirst(strtolower(str_replace('_', ' ', $title))), ENT_QUOTES);
+            // Display the title exactly as the LGU typed it — matching
+            // appendLayerToXml()'s municipal thumbnails. Only underscores become
+            // spaces; capitalization is the user's, not ours.
+            $safeText      = htmlspecialchars(str_replace('_', ' ', $title), ENT_QUOTES);
             $municipalName = htmlspecialchars(ucwords(strtolower(trim((string) $scene->municipal))), ENT_QUOTES);
             $category      = (string) ($scene->category ?? '');
             $safeCategory  = htmlspecialchars($category, ENT_QUOTES);
